@@ -11,11 +11,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const tabs = [
     { name: "Data & Storage", path: "/settings/storage" },
     { name: "WhatsApp API", path: "/settings/whatsapp" },
+    { name: "Users", path: "/settings/users" },
   ];
-
-  if (user?.role === "admin") {
-    tabs.push({ name: "Users", path: "/settings/users" });
-  }
 
   return (
     <div style={{ padding: "32px", fontFamily: "'Inter', sans-serif", backgroundColor: "#f4f7f6", minHeight: "100vh" }}>

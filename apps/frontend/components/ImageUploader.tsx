@@ -48,26 +48,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       reader.readAsDataURL(file);
     });
 
-    let filePath = "";
-
-    try {
-      // save to Electron backend
-      if ((window as any).api?.saveImage) {
-        const saved = await (window as any).api.saveImage({
-          base64,
-          name: file.name,
-        });
-
-        filePath = saved.filePath;
-      }
-    } catch (err) {
-      console.error(" Image save failed:", err);
-    }
-
     newImages.push({
       id: crypto.randomUUID(),
       url: base64, 
-      filePath: filePath || "",     // REAL STORAGE PATH
+      filePath: "", // Will be saved to disk upon Report Save
       label: `Image ${images.length + i + 1}`,
       brightness: 100,
       contrast: 100,
@@ -183,6 +167,41 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </div>
 
 
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <button
+                    onClick={() => {
+                      if (index === 0) return;
+                      const newImages = [...images];
+                      [newImages[index], newImages[index - 1]] = [newImages[index - 1], newImages[index]];
+                      onImagesUpdated(newImages);
+                    }}
+                    disabled={index === 0}
+                    style={{
+                      padding: "4px 8px", backgroundColor: index === 0 ? "#e9ecef" : "#f8f9fa",
+                      border: "1px solid #ddd", borderRadius: 3, cursor: index === 0 ? "not-allowed" : "pointer",
+                      fontSize: 10, color: index === 0 ? "#adb5bd" : "#495057"
+                    }}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (index === images.length - 1) return;
+                      const newImages = [...images];
+                      [newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]];
+                      onImagesUpdated(newImages);
+                    }}
+                    disabled={index === images.length - 1}
+                    style={{
+                      padding: "4px 8px", backgroundColor: index === images.length - 1 ? "#e9ecef" : "#f8f9fa",
+                      border: "1px solid #ddd", borderRadius: 3, cursor: index === images.length - 1 ? "not-allowed" : "pointer",
+                      fontSize: 10, color: index === images.length - 1 ? "#adb5bd" : "#495057"
+                    }}
+                  >
+                    ▼
+                  </button>
+                </div>
+
                 <button
                   onClick={() => onImageRemoved(img.id)}
                   style={{
@@ -194,6 +213,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     cursor: "pointer",
                     fontSize: 11,
                     fontWeight: "bold",
+                    marginLeft: 4
                   }}
                 >
                   ✕

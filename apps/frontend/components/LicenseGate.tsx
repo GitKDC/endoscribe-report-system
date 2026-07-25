@@ -90,20 +90,8 @@ export default function LicenseGate({ children }: { children: React.ReactNode })
         maxWidth: "450px",
         textAlign: "center"
       }}>
-        <div style={{ 
-          width: "60px", 
-          height: "60px", 
-          background: "#fef2f2", 
-          borderRadius: "50%", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "center", 
-          margin: "0 auto 20px" 
-        }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-          </svg>
+        <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
+          <img src="/es-logo.svg" alt="EndoScribe Logo" style={{ width: "80px", height: "auto", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
         </div>
         
         <h2 style={{ margin: "0 0 10px 0", color: "#0f172a", fontSize: "24px" }}>Software Locked</h2>

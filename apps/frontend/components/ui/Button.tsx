@@ -86,6 +86,10 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled}
       onMouseEnter={(e) => {
         if (disabled) return;
+        if (style && (style.backgroundColor || style.background)) {
+          e.currentTarget.style.opacity = "0.85";
+          return;
+        }
         if (variant === "primary") e.currentTarget.style.backgroundColor = THEME.primaryHover;
         if (variant === "secondary") e.currentTarget.style.backgroundColor = THEME.secondaryHover;
         if (variant === "danger") e.currentTarget.style.backgroundColor = THEME.dangerHover;
@@ -94,6 +98,10 @@ export const Button: React.FC<ButtonProps> = ({
       }}
       onMouseLeave={(e) => {
         if (disabled) return;
+        if (style && (style.backgroundColor || style.background)) {
+          e.currentTarget.style.opacity = "1";
+          return;
+        }
         if (variant === "primary") e.currentTarget.style.backgroundColor = THEME.primaryBg;
         if (variant === "secondary") e.currentTarget.style.backgroundColor = THEME.secondaryBg;
         if (variant === "danger") e.currentTarget.style.backgroundColor = THEME.dangerBg;

@@ -69,7 +69,7 @@ export default function LoginScreen() {
     setSuccessMsg("");
     try {
       if (isFirstTime) {
-        const res = await (window as any).api.createUser(username.trim(), password, "admin");
+        const res = await (window as any).api.createUser(username.trim(), password, "user");
         if (res.success) {
           login(res.data);
         } else {
@@ -163,18 +163,14 @@ export default function LoginScreen() {
         boxShadow: "0 20px 40px rgba(0,0,0,0.08)", width: "100%", maxWidth: "420px"
       }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{
-            background: THEME.navy, color: "white", width: "60px", height: "60px",
-            borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "28px", fontWeight: "bold", margin: "0 auto 16px"
-          }}>
-            E
+          <div style={{ margin: "0 auto 16px", display: "flex", justifyContent: "center" }}>
+            <img src="/es-logo.svg" alt="EndoScribe Logo" style={{ width: "80px", height: "auto", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
           </div>
           <h1 style={{ color: THEME.navy, margin: "0 0 8px", fontSize: "24px", fontWeight: "800" }}>
             {isRecovering ? "Account Recovery" : isFirstTime ? "Welcome to EndoScribe" : "Welcome Back"}
           </h1>
           <p style={{ color: THEME.muted, margin: 0, fontSize: "14px", fontWeight: "500" }}>
-            {isRecovering ? (recoveryStep === 1 ? "Enter your Master Recovery Key" : "Create a new Admin password") : isFirstTime ? "Create your master admin account to get started" : "Please log in to your account"}
+            {isRecovering ? (recoveryStep === 1 ? "Enter your Master Recovery Key" : "Create a new password") : isFirstTime ? "Create your master account to get started" : "Please log in to your account"}
           </p>
         </div>
 
@@ -380,7 +376,7 @@ export default function LoginScreen() {
             disabled={isSubmitting}
             type="submit"
           >
-            {isSubmitting ? "Please wait..." : isFirstTime ? "Create Admin Account" : "Sign In"}
+            {isSubmitting ? "Please wait..." : isFirstTime ? "Create Account" : "Sign In"}
           </Button>
         </form>
         )}

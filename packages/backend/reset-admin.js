@@ -1,22 +1,15 @@
 const sqlite3 = require("@journeyapps/sqlcipher").verbose();
 const path = require("path");
 const fs = require("fs");
+const { getDatabasePath } = require("./utils/appPaths");
 
-const os = require("os");
-
-const dbPath = path.join(os.homedir(), "AppData", "Roaming", "EndoScribe", "database", "endoscribe_secure.db");
+const dbPath = getDatabasePath();
 
 if (!fs.existsSync(dbPath)) {
-  console.log("Database not found at:", dbPath);
-  console.log("Checking endoscopy-electron folder instead...");
-  const altPath = path.join(os.homedir(), "AppData", "Roaming", "endoscopy-electron", "database", "endoscribe_secure.db");
-  if (fs.existsSync(altPath)) {
-    startReset(altPath);
-  } else {
-    console.log("Could not find the database! You might need to completely wipe the AppData folder to start over.");
-    process.exit(1);
-  }
+  console.log("Could not find the database at:", dbPath);
+  process.exit(1);
 } else {
+  console.log("Found active database at:", dbPath);
   startReset(dbPath);
 }
 

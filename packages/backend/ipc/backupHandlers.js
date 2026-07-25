@@ -80,9 +80,14 @@ function registerBackupHandlers() {
     }
 
     const date = new Date().toISOString().split("T")[0];
+    const { readConfig } = require("../utils/config");
+    const config = readConfig();
+    const backupDir = config.storagePaths.backups || require("../utils/appPaths").getBackupsBasePath();
+    const defaultPath = path.join(backupDir, `EndoScribe_Backup_${date}.zip`);
+
     const { filePath, canceled } = await dialog.showSaveDialog({
       title: "Save Backup",
-      defaultPath: `EndoScribe_Backup_${date}.zip`,
+      defaultPath,
       filters: [{ name: "ZIP Files", extensions: ["zip"] }],
     });
 

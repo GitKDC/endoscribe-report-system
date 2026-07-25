@@ -33,9 +33,14 @@ function registerPatientHandlers() {
       const reports = reportsData.data || [];
       if (reports.length === 0) return { success: false, message: "No data to export" };
 
+      const { readConfig } = require("../utils/config");
+      const config = readConfig();
+      const exportDir = config.storagePaths.exports || require("electron").app.getPath("downloads");
+      const defaultPath = require("path").join(exportDir, `patients_export_${new Date().toISOString().split("T")[0]}.csv`);
+
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Save Patients CSV",
-        defaultPath: `patients_export_${new Date().toISOString().split("T")[0]}.csv`,
+        defaultPath,
         filters: [{ name: "CSV Files", extensions: ["csv"] }]
       });
 

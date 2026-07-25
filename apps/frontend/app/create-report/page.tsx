@@ -274,6 +274,9 @@ function CreateReportInner() {
     setPatientAge("");
     setReportDate(getCurrentDateForInput());
     setReportType("UGI");
+    setReferralName("");
+    setReferralId(null);
+    setReferralPhone("");
     
     // Auto fill UGI sections on reset if available
     const ugiCat = categories.find(c => c.name === "UGI");
@@ -354,6 +357,26 @@ function CreateReportInner() {
   const handleDownloadPDF = () => {
     if (!validateForm()) return;
     runAction(setPdfState, async () => {
+    
+    // ── 0. Save Images to Disk ───────────────────────────────────────────────
+    let finalImages = [...images];
+    if ((window as any).api?.saveImage) {
+      for (let i = 0; i < finalImages.length; i++) {
+        if (!finalImages[i].filePath && finalImages[i].url.startsWith("data:image")) {
+          try {
+            const savedImg = await (window as any).api.saveImage({
+              base64: finalImages[i].url,
+              name: `image_${i}.jpg`,
+            });
+            finalImages[i] = { ...finalImages[i], filePath: savedImg.filePath };
+          } catch (e) {
+            console.error("Failed to save image to disk:", e);
+          }
+        }
+      }
+      setImages(finalImages); // Update state so they aren't re-saved
+    }
+
     // ── 1. Save report to DB (auto, no extra button needed) ──────────────────
     let savedReportNo = reportNumber; // reuse if already saved
     if (!(window as any).api) {
@@ -377,7 +400,7 @@ function CreateReportInner() {
           referralDoctorPhone: referralPhone,
           reportType,
           sections,
-          images: images.map((img, i) => ({
+          images: finalImages.map((img, i) => ({
             filePath: img.filePath,
             position: i,
             nbiLabel: img.nbiLabel || null,

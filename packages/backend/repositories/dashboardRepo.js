@@ -43,11 +43,12 @@ const dashboardRepo = {
         // Storage Calculation
         let storageUsedBytes = 0;
         try {
-          const userDataPath = app.getPath("userData");
-          const dbPath = path.join(userDataPath, "endoscopy.db");
-          const imagesPath = path.join(userDataPath, "images");
+          const { readConfig } = require("../utils/config");
+          const config = readConfig();
+          const dbPath = config.storagePaths.database;
+          const imagesPath = config.storagePaths.images;
 
-          if (fs.existsSync(dbPath)) storageUsedBytes += fs.statSync(dbPath).size;
+          if (fs.existsSync(dbPath)) storageUsedBytes += getDirSize(dbPath);
           if (fs.existsSync(imagesPath)) storageUsedBytes += getDirSize(imagesPath);
         } catch (e) {
           console.error("Failed to calculate storage size", e);

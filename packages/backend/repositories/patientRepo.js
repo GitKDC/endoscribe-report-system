@@ -45,7 +45,9 @@ const patientRepo = {
 
         let dataQuery = `
           SELECT 
-            p.id, p.name, p.phone, p.age, p.gender, p.city, p.procedure_type, p.created_at,
+            p.id, p.name, p.phone, p.age, p.gender, p.city, 
+            COALESCE(p.procedure_type, (SELECT report_type FROM reports r WHERE r.patient_id = p.id ORDER BY created_at DESC LIMIT 1)) as procedure_type, 
+            p.created_at,
             (SELECT COUNT(*) FROM reports r WHERE r.patient_id = p.id) as report_count,
             (SELECT MAX(created_at) FROM reports r WHERE r.patient_id = p.id) as last_visit
           ${baseQuery}
@@ -64,7 +66,7 @@ const patientRepo = {
   // Get a specific patient, along with their reports
   getPatient: (id) => {
     return new Promise((resolve, reject) => {
-      const query = `SELECT id, name, phone, age, gender, city, procedure_type, created_at, updated_at FROM patients WHERE id = ?`;
+      const query = `SELECT id, name, phone, age, gender, city, COALESCE(procedure_type, (SELECT report_type FROM reports r WHERE r.patient_id = patients.id ORDER BY created_at DESC LIMIT 1)) as procedure_type, created_at, updated_at FROM patients WHERE id = ?`;
       db.get(query, [id], (err, patient) => {
         if (err) return reject(err);
         if (!patient) return resolve(null);

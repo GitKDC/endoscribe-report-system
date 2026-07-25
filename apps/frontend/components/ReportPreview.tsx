@@ -41,7 +41,7 @@ interface ReportPreviewProps {
 // Maps internal report type codes to the display title shown on the report
 const REPORT_TITLE_MAP: Record<string, string> = {
   UGI: "UPPER GI ENDOSCOPY",
-  VLS: "VLS SCOPY",
+  VLS: "VLS Scopy",
   SIGMOIDOSCOPY: "SIGMOIDOSCOPY",
   COLONOSCOPY: "COLONOSCOPY",
 };
@@ -90,19 +90,33 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
     (s) => s.isHeading || (s.content && s.content.trim() !== "")
   );
 
+  // Calculate approximate lines by counting explicit newlines + estimating wrapped lines
+  const approxLines = visibleSections.reduce(
+    (sum, s) => {
+      const explicitNewlines = (s.content?.match(/\n/g) || []).length;
+      const wrappedLines = Math.floor((s.content?.length || 0) / 60);
+      return sum + explicitNewlines + wrappedLines + 1; // +1 for the title/base line
+    },
+    0
+  );
+
   const totalLen = visibleSections.reduce(
     (sum, s) => sum + (s.content?.length || 0),
     0
   );
 
-  const bodyFont = totalLen > 700 ? "13px" : totalLen > 450 ? "14px" : "15px";
-  const lineH    = totalLen > 700 ? 1.4   : totalLen > 450 ? 1.45  : 1.5;
-  const paraGap  = totalLen > 700 ? "8px" : "11px";
-
   // Images 1-4 → right column stacked
   // Images 5-6 → below text in left column
   const rightImages  = images.slice(0, 4);
   const bottomImages = images.slice(4, 6);
+
+  // Bottom images take up ~190px of vertical space. 
+  // We add an "effective line" penalty so the font shrinks earlier when bottom images are present.
+  const effectiveLines = approxLines + (bottomImages.length > 0 ? 8 : 0);
+
+  const bodyFont = effectiveLines > 28 || totalLen > 1100 ? "13px" : effectiveLines > 24 || totalLen > 900 ? "14px" : effectiveLines > 19 || totalLen > 700 ? "15px" : "16px";
+  const lineH    = effectiveLines > 28 || totalLen > 1100 ? 1.35   : effectiveLines > 24 || totalLen > 900 ? 1.4    : effectiveLines > 19 || totalLen > 700 ? 1.4    : 1.45;
+  const paraGap  = effectiveLines > 28 || totalLen > 1100 ? "4px"  : effectiveLines > 24 || totalLen > 900 ? "6px"  : effectiveLines > 19 || totalLen > 700 ? "8px"  : "10px";
 
   const displayTitle = REPORT_TITLE_MAP[reportType] || reportType || "UPPER GI ENDOSCOPY";
 
@@ -127,6 +141,8 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
           border: "1px solid #bfa000",   
           boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
           zIndex: 2,
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
         }}
       >
         {label}
@@ -217,17 +233,6 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
               : "Patient Name"}
           </p>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-            {reportNumber && (
-              <p id="report-number-display" style={{
-                margin: 0, fontSize: "12px", fontWeight: "600",
-                color: "#1a3a52", letterSpacing: "0.3px",
-                border: "1px solid #1a3a52",
-                padding: "1px 8px", borderRadius: "3px",
-                whiteSpace: "nowrap",
-              }}>
-                Ref: {reportNumber}
-              </p>
-            )}
             <p style={{
               margin: 0, fontSize: "12px", fontWeight: "800",
               color: "#333", border: "1px solid #999",
@@ -240,7 +245,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         {/* Content split (Left / Right) */}
-        <div style={{ display: "flex", gap: "16px", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: "8px", flex: 1, minHeight: 0, overflow: "hidden" }}>
           {/* ── LEFT: title + text + bottom images ────────── */}
           <div
             style={{
@@ -279,8 +284,8 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                   style={{
                     display: "block",
                     width: "fit-content",
-                    border: "1.5px solid #c0392b",
-                    color: "#c0392b",
+                    border: "1.5px solid #f53a3a",
+                    color: "#f53a3a",
                     fontWeight: "900",
                     textTransform: "uppercase",
                     fontSize: bodyFont,
@@ -307,23 +312,33 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                 <p
                   key={index}
                   style={{
-                    marginBottom: "10px",
-                    color:
-                      section.title.toLowerCase() === "impression"
-                        ? "#111"
-                        : section.highlight
-                        ? "#c0392b"
-                        : "#111",
+                    marginBottom: paraGap,
+                    color: "#111", // Base color is always black
                     fontWeight: section.highlight ? "bold" : "normal",
                   }}
                 >
-                  <strong>{section.title}:- </strong>
+                  {section.title && section.title.trim() !== "" && (
+                    <strong
+                      style={{
+                        fontWeight: "bold",
+                        color:
+                          section.title.toLowerCase() === "impression"
+                            ? "#111"
+                            : section.highlight
+                            ? "#f53a3a"
+                            : "#111",
+                      }}
+                    >
+                      {section.title}:-{" "}
+                    </strong>
+                  )}
                   <span
                     style={{ whiteSpace: "pre-line" }}
                     dangerouslySetInnerHTML={{
-                      __html: section.content
+                      __html: (section.content || "")
                         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                         .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                        .replace(/!!(.*?)!!/g, '<span style="color: #f53a3a;">$1</span>'),
                     }}
                   />
                 </p>
@@ -339,7 +354,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                 display: "flex",
                 gap: "8px",
                 marginTop: "auto",
-                marginBottom: "16px",
+                marginBottom: "40px",
                 height: "190px",
               }}
             >
@@ -443,6 +458,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
             gap: "20px",
             fontSize: "11.5px",
             lineHeight: 1.3,
+            flex: 1,
           }}
         >
           {footerDoctors.map((doc) => (
@@ -459,25 +475,37 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         {/* RIGHT: WEO */}
-        <div style={{ textAlign: "right" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", paddingRight: "16px", marginLeft: "auto", flexShrink: 0 }}>
           <img
             src="/images/weo.png"
             alt="WEO"
-            style={{ height: "32px", display: "block", marginLeft: "auto" }}
+            style={{ height: "42px", display: "block" }}
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
-          <p
-            style={{
-              fontSize: "10px",
-              color: "#2a7a2a",
-              margin: "2px 0 0 0",
-              fontWeight: "600",
-            }}
-          >
-            Recognized by World Endoscopy Organization
-          </p>
+          <div style={{ textAlign: "right" }}>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "#2a7a2a",
+                margin: 0,
+                fontWeight: "700",
+              }}
+            >
+              विश्व एंडोस्कोपी संस्था द्वारा प्रमाणित
+            </p>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "#2a7a2a",
+                margin: "1px 0 0 0",
+                fontWeight: "700",
+              }}
+            >
+              Recognized by World Endoscopy Organization
+            </p>
+          </div>
         </div>
       </div>
     </div>

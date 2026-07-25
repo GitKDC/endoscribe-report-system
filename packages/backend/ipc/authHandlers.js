@@ -28,7 +28,7 @@ function registerAuthHandlers() {
 
   ipcMain.handle("auth:createUser", async (event, username, password, role) => {
     try {
-      const newUser = await userRepo.createUser(username, password, role);
+      const newUser = await userRepo.createUser(username, password, "user");
       return { success: true, data: newUser };
     } catch (error) {
       console.error("Error creating user:", error);

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IoIosArrowDown } from "react-icons/io";
 
 interface PatientFormProps {
   initialData?: any;
@@ -89,11 +90,16 @@ export default function PatientForm({ initialData, onClose, onSave }: PatientFor
             </div>
             <div style={{ flex: 1 }}>
               <label style={lbl}>Gender</label>
-              <select value={gender} onChange={e => setGender(e.target.value)} style={inp}>
-                <option value="M">Male</option>
-                <option value="F">Female</option>
-                <option value="O">Other</option>
-              </select>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <select value={gender} onChange={e => setGender(e.target.value)} style={{...inp, paddingRight: "32px", cursor: "pointer", WebkitAppearance: "none", MozAppearance: "none", appearance: "none"}}>
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                  <option value="O">Other</option>
+                </select>
+                <div style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "#64748b", display: "flex" }}>
+                  <IoIosArrowDown size={16} />
+                </div>
+              </div>
             </div>
           </div>
           
@@ -104,15 +110,20 @@ export default function PatientForm({ initialData, onClose, onSave }: PatientFor
             </div>
             <div style={{ flex: 1 }}>
               <label style={lbl}>Procedure Type</label>
-              <select value={procedureType} onChange={e => setProcedureType(e.target.value)} style={inp}>
-                <option value="">Select Procedure</option>
-                <option value="UGI">UGI</option>
-                <option value="VLS">VLS</option>
-                <option value="SIGMOIDOSCOPY">SIGMOIDOSCOPY</option>
-                <option value="COLONOSCOPY">COLONOSCOPY</option>
-                <option value="ERCP">ERCP</option>
-                <option value="ENTEROSCOPY">ENTEROSCOPY</option>
-              </select>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <select value={procedureType} onChange={e => setProcedureType(e.target.value)} style={{...inp, paddingRight: "32px", cursor: "pointer", WebkitAppearance: "none", MozAppearance: "none", appearance: "none"}}>
+                  <option value="">Select Procedure</option>
+                  <option value="UGI">UGI</option>
+                  <option value="VLS">VLS</option>
+                  <option value="SIGMOIDOSCOPY">SIGMOIDOSCOPY</option>
+                  <option value="COLONOSCOPY">COLONOSCOPY</option>
+                  <option value="ERCP">ERCP</option>
+                  <option value="ENTEROSCOPY">ENTEROSCOPY</option>
+                </select>
+                <div style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "#64748b", display: "flex" }}>
+                  <IoIosArrowDown size={16} />
+                </div>
+              </div>
             </div>
           </div>
 

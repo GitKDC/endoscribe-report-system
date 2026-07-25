@@ -82,6 +82,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [newFieldTitle, setNewFieldTitle] = useState("");
   const [docMenuOpen, setDocMenuOpen] = useState(false);
+  const [docIndex, setDocIndex] = useState(-1);
 
   // ── Patient Autocomplete ──
   const [patients, setPatients] = useState<any[]>([]);
@@ -91,6 +92,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
   // ── Referral Autocomplete ──
   const [referrals, setReferrals] = useState<any[]>([]);
   const [showReferralSugs, setShowReferralSugs] = useState(false);
+  const [referralIndex, setReferralIndex] = useState(-1);
   const referralInputRef = useRef<HTMLDivElement>(null);
 
   // ref for the trigger element — used to measure where to place the dropdown
@@ -254,10 +256,10 @@ const ReportForm: React.FC<ReportFormProps> = ({
     setNewFieldTitle("");
   };
 
-  const applyFormat = (i: number, ta: HTMLTextAreaElement, type: "bold" | "italic") => {
+  const applyFormat = (i: number, ta: HTMLTextAreaElement, type: "bold" | "italic" | "red") => {
     const { selectionStart: s, selectionEnd: e, value } = ta;
     if (s === e) return;
-    const w = type === "bold" ? "**" : "*";
+    const w = type === "bold" ? "**" : type === "italic" ? "*" : "!!";
     const nc = value.slice(0, s) + w + value.slice(s, e) + w + value.slice(e);
     setSections(p => p.map((sec, idx) => idx === i ? { ...sec, content: nc } : sec));
   };
@@ -308,8 +310,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
         <div style={card}>
           <h4 style={cardHdr}>{icon(<FiUser color={THEME.teal} />, THEME.teal + "18")} Patient Information</h4>
 
-          <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-            <div style={{ flex: 2 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+            <div style={{ flex: "2 1 250px" }}>
               <label style={lbl}>Patient Name</label>
               <div style={{ display: "flex", gap: "6px" }}>
                 <div style={{ position: "relative", display: "flex", alignItems: "center", width: "76px", flexShrink: 0 }}>
@@ -377,7 +379,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
               </div>
             </div>
 
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 120px" }}>
               <label style={lbl}>Age / Gender</label>
               <div style={{ display: "flex", gap: "6px" }}>
                 <input type="number" value={age}
@@ -415,9 +417,31 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   onReferralNameChange(e.target.value);
                   onReferralIdChange?.(null);
                   setShowReferralSugs(true);
+                  setReferralIndex(-1);
                 }}
                 onFocus={() => { focus("rf")(); setShowReferralSugs(true); }}
                 onBlur={blur}
+                onKeyDown={e => {
+                  const filtered = referrals.filter(r => r.name.toLowerCase().includes(referralName.toLowerCase()));
+                  if (showReferralSugs && filtered.length > 0) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setReferralIndex(i => Math.min(i + 1, filtered.length - 1));
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setReferralIndex(i => Math.max(i - 1, 0));
+                    } else if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (referralIndex >= 0 && filtered[referralIndex]) {
+                        const r = filtered[referralIndex];
+                        onReferralNameChange(r.name);
+                        if (r.phone) onReferralPhoneChange(r.phone);
+                        onReferralIdChange?.(r.id);
+                        setShowReferralSugs(false);
+                      }
+                    }
+                  }
+                }}
                 style={{ ...inp("rf"), width: "100%" }} 
                 placeholder="Search referral doctor..." 
               />
@@ -428,17 +452,18 @@ const ReportForm: React.FC<ReportFormProps> = ({
                       New Referral Doctor will be created.
                     </div>
                   ) : (
-                    referrals.filter(r => r.name.toLowerCase().includes(referralName.toLowerCase())).map(r => (
+                    referrals.filter(r => r.name.toLowerCase().includes(referralName.toLowerCase())).map((r, i) => (
                       <div 
                         key={r.id}
                         className="pat-sug"
+                        onMouseEnter={() => setReferralIndex(i)}
                         onClick={() => {
                           onReferralNameChange(r.name);
                           if (r.phone) onReferralPhoneChange(r.phone);
                           onReferralIdChange?.(r.id);
                           setShowReferralSugs(false);
                         }}
-                        style={{ padding: "10px", borderBottom: "1px solid #eee", cursor: "pointer", display: "flex", justifyContent: "space-between" }}
+                        style={{ padding: "10px", borderBottom: "1px solid #eee", cursor: "pointer", display: "flex", justifyContent: "space-between", background: referralIndex === i ? THEME.tealBg : "white" }}
                       >
                         <span style={{ fontWeight: 600, color: THEME.navy }}>{r.name}</span>
                         {r.clinic_name && <span style={{ color: "#666", fontSize: "13px" }}>🏥 {r.clinic_name}</span>}
@@ -463,8 +488,8 @@ const ReportForm: React.FC<ReportFormProps> = ({
               style={{ ...inp("rfph"), width: "100%" }} />
           </div>
 
-          <div style={{ display: "flex", gap: "10px" }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            <div style={{ flex: "1 1 120px" }}>
               <label style={lbl}>Date</label>
               <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                 <input type="date" value={reportDate} onChange={e => onReportDateChange(e.target.value)}
@@ -474,11 +499,33 @@ const ReportForm: React.FC<ReportFormProps> = ({
             </div>
 
             {/* ── Doctor multi-select — uses fixed positioning to avoid overflow ── */}
-            <div style={{ flex: 1.5 }}>
+            <div style={{ flex: "1.5 1 220px" }}>
               <label style={lbl}>Doctor(s)</label>
               <div
                 ref={triggerRef}
+                tabIndex={0}
                 onClick={() => setDocMenuOpen(o => !o)}
+                onKeyDown={e => {
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (!docMenuOpen) {
+                      setDocMenuOpen(true);
+                      setDocIndex(0);
+                    } else {
+                      if (e.key === "ArrowDown") setDocIndex(i => Math.min(i + 1, doctors.length - 1));
+                      else if (e.key === "ArrowUp") setDocIndex(i => Math.max(i - 1, 0));
+                    }
+                  } else if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    if (!docMenuOpen) {
+                      setDocMenuOpen(true);
+                    } else if (docIndex >= 0 && doctors[docIndex]) {
+                      toggleDoctor(doctors[docIndex].id);
+                    }
+                  } else if (e.key === "Escape") {
+                    setDocMenuOpen(false);
+                  }
+                }}
                 style={{
                   ...inp("doc"),
                   cursor: "pointer",
@@ -528,13 +575,16 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         No doctors yet. Add from Dashboard.
                       </div>
                     )}
-                    {doctors.map(d => {
+                    {doctors.map((d, i) => {
                       const checked = selectedDoctorIds.includes(d.id);
                       return (
-                        <label key={d.id} className="doc-opt" style={{
+                        <label key={d.id} className="doc-opt" 
+                          onMouseEnter={() => setDocIndex(i)}
+                          style={{
                           display: "flex", alignItems: "flex-start", gap: "8px",
                           padding: "9px 12px", cursor: "pointer",
                           borderBottom: `1px solid ${THEME.border}`,
+                          background: docIndex === i ? THEME.tealBg : "transparent",
                         }}>
                           <input
                             type="checkbox"
@@ -638,7 +688,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   </label>
 
                   <div style={{ display: "flex", gap: "4px" }}>
-                    {(["bold", "italic"] as const).map(fmt => (
+                    {(["bold", "italic", "red"] as const).map(fmt => (
                       <button key={fmt} className="rfmt" type="button"
                         onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
                         style={{
@@ -646,9 +696,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
                           borderRadius: "5px", cursor: "pointer", fontSize: "12px",
                           fontWeight: fmt === "bold" ? "700" : "400",
                           fontStyle: fmt === "italic" ? "italic" : "normal",
-                          background: "white", color: THEME.muted, fontFamily: "inherit",
+                          background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
                           transition: "background 0.12s",
-                        }}>{fmt === "bold" ? "B" : "I"}</button>
+                        }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
                     ))}
                     {!isHL && (
                       <button className="rrem" onClick={() => deleteSection(i)} style={{

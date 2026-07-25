@@ -76,7 +76,8 @@ function registerStorageHandlers() {
     const bakSize = fs.existsSync(config.storagePaths.backups) ? await getFolderSize(config.storagePaths.backups) : 0;
     const totalSize = dbSize + imgSize + repSize + bakSize;
     
-    const spaceInfo = await getDiskSpace(config.storagePaths.base);
+    // Check space on the drive where the Database is stored (since base might still point to C: drive)
+    const spaceInfo = await getDiskSpace(config.storagePaths.database);
 
     return {
       databaseBytes: dbSize,

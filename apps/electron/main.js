@@ -67,6 +67,10 @@ async function createWindow() {
     console.log("URL loaded successfully");
   } catch (err) {
     console.error("Failed to load URL:", err);
+    // Destroy the blank failed window before creating a new one
+    if (win && !win.isDestroyed()) {
+      win.destroy();
+    }
     setTimeout(() => createWindow(), 2000);
   }
 }

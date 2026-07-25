@@ -28,10 +28,12 @@ const getAnalytics = (filters = {}) => {
         ORDER BY value DESC
       `);
 
+      const totalDiseaseOccurrences = diseasesRaw.reduce((sum, d) => sum + d.value, 0);
+
       // Add percentage
       const diseaseDistribution = diseasesRaw.map(d => ({
         ...d,
-        percentage: totalReports > 0 ? ((d.value / totalReports) * 100).toFixed(1) : 0
+        percentage: totalDiseaseOccurrences > 0 ? ((d.value / totalDiseaseOccurrences) * 100).toFixed(1) : 0
       }));
 
       // Age distribution per disease
@@ -155,7 +157,7 @@ const getAnalytics = (filters = {}) => {
       // Type breakdown
       const typeBreakdown = await query(`SELECT report_type as name, COUNT(*) as value FROM reports GROUP BY report_type`);
 
-      // ─── RESTORED OLD ANALYTICS LOGIC ───
+      // ─── RESTORED OLD ANALYTICS LOGIC (SCALABLE) ───
       const dowData = await query(`SELECT cast(strftime('%w', created_at) as integer) as day, COUNT(*) as count FROM reports GROUP BY day`);
       const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const reportsByDayOfWeek = days.map((day, i) => {
@@ -165,14 +167,8 @@ const getAnalytics = (filters = {}) => {
 
       const cityReferralData = await query(`SELECT rd.city, COUNT(r.id) as value FROM reports r JOIN referral_doctors rd ON r.referral_doctor_id = rd.id WHERE rd.city IS NOT NULL AND rd.city != '' GROUP BY rd.city ORDER BY value DESC`);
       
-      const allReports = await query(`SELECT age, sections, report_type FROM reports`);
       const oldKeywords = ["Polyp", "Colitis", "Carcinoma", "Bleeding", "Ulcer", "Erythema", "Gastritis"];
       const keywordCounts = {};
-      oldKeywords.forEach(k => keywordCounts[k] = 0);
-
-      let ercpCount = 0;
-      let enteroscopyCount = 0;
-
       const ageAnalytics = {
         "0-20": { total: 0, conditions: {} },
         "21-40": { total: 0, conditions: {} },
@@ -180,34 +176,60 @@ const getAnalytics = (filters = {}) => {
         "61+": { total: 0, conditions: {} }
       };
 
-      allReports.forEach(row => {
-        const text = (row.sections || "").toLowerCase() + " " + (row.report_type || "").toLowerCase();
+      // Total by age bracket
+      const ageTotals = await query(`
+        SELECT 
+          CASE 
+            WHEN age <= 20 THEN '0-20'
+            WHEN age <= 40 THEN '21-40'
+            WHEN age <= 60 THEN '41-60'
+            ELSE '61+' 
+          END as age_group,
+          COUNT(*) as cnt
+        FROM reports
+        WHERE age IS NOT NULL
+        GROUP BY age_group
+      `);
+      ageTotals.forEach(row => {
+        if (ageAnalytics[row.age_group]) {
+          ageAnalytics[row.age_group].total = row.cnt;
+        }
+      });
+
+      // Conditions by age
+      for (const k of oldKeywords) {
+        const keywordData = await query(`
+          SELECT 
+            CASE 
+              WHEN age <= 20 THEN '0-20'
+              WHEN age <= 40 THEN '21-40'
+              WHEN age <= 60 THEN '41-60'
+              ELSE '61+' 
+            END as age_group,
+            COUNT(*) as cnt
+          FROM reports
+          WHERE LOWER(sections) LIKE ? OR LOWER(report_type) LIKE ?
+          GROUP BY age_group
+        `, [`%${k.toLowerCase()}%`, `%${k.toLowerCase()}%`]);
         
-        oldKeywords.forEach(k => {
-          if (text.includes(k.toLowerCase())) {
-            keywordCounts[k]++;
-            if (row.age) {
-              let group = "61+";
-              if (row.age <= 20) group = "0-20";
-              else if (row.age <= 40) group = "21-40";
-              else if (row.age <= 60) group = "41-60";
-              if (!ageAnalytics[group].conditions[k]) ageAnalytics[group].conditions[k] = 0;
-              ageAnalytics[group].conditions[k]++;
-            }
+        let totalForKey = 0;
+        keywordData.forEach(row => {
+          if (row.age_group && ageAnalytics[row.age_group]) {
+            ageAnalytics[row.age_group].conditions[k] = row.cnt;
+            totalForKey += row.cnt;
           }
         });
+        keywordCounts[k] = totalForKey;
+      }
 
-        if (row.age) {
-          let group = "61+";
-          if (row.age <= 20) group = "0-20";
-          else if (row.age <= 40) group = "21-40";
-          else if (row.age <= 60) group = "41-60";
-          ageAnalytics[group].total++;
-        }
-
-        if (text.includes("ercp")) ercpCount++;
-        if (text.includes("enteroscopy")) enteroscopyCount++;
-      });
+      // Special procedures
+      const getProcCount = async (proc) => {
+        const res = await get(`SELECT COUNT(*) as cnt FROM reports WHERE LOWER(sections) LIKE ? OR LOWER(report_type) LIKE ?`, [`%${proc}%`, `%${proc}%`]);
+        return res ? res.cnt : 0;
+      };
+      
+      const ercpCount = await getProcCount('ercp');
+      const enteroscopyCount = await getProcCount('enteroscopy');
 
       const topImpressions = Object.keys(keywordCounts)
         .map(k => ({ name: k, value: keywordCounts[k] }))

@@ -59,9 +59,14 @@ const registerReportHandlers = () => {
       if (reports.length === 0) return { success: false, message: "No data to export" };
 
       // 2. Open Save Dialog
+      const { readConfig } = require("../utils/config");
+      const config = readConfig();
+      const exportDir = config.storagePaths.exports || require("electron").app.getPath("downloads");
+      const defaultPath = require("path").join(exportDir, `reports_export_${new Date().toISOString().split("T")[0]}.csv`);
+
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: "Save CSV Export",
-        defaultPath: `reports_export_${new Date().toISOString().split("T")[0]}.csv`,
+        defaultPath,
         filters: [{ name: "CSV Files", extensions: ["csv"] }]
       });
 

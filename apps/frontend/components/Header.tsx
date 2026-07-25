@@ -17,7 +17,7 @@ export default function Header() {
 
   return (
     <div style={{
-      padding: "16px 24px",
+      padding: "8px 24px",
       background: "#1a3a52", // THEME.navy
       color: "#ffffff",
       display: "flex",
@@ -28,7 +28,8 @@ export default function Header() {
       zIndex: 10
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <span style={{ fontSize: "16px", fontWeight: "600", letterSpacing: "0.5px" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "16px", fontWeight: "600", letterSpacing: "0.5px" }}>
+          <img src="/es-logo.svg" alt="Logo" style={{ width: "24px", height: "24px", borderRadius: "4px" }} />
           ENDOSCRIBE
         </span>
         {time && (
@@ -49,10 +50,16 @@ export default function Header() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-          <span style={{ fontSize: "15px", fontWeight: "600", lineHeight: "1.2" }}>
+          <span style={{ fontSize: "15px", fontWeight: "600", lineHeight: "1.3" }}>
             Dr. Hrushikesh Chaudhari
           </span>
-          <span style={{ fontSize: "11px", fontWeight: "500", color: "#cbd5e1", marginTop: "2px" }}>
+          <span style={{ fontSize: "10px", fontWeight: "500", color: "#cbd5e1", marginTop: "1px" }}>
+            DNB(Med.), DNB(Gastro), MNAMS(New Delhi)
+          </span>
+          <span style={{ fontSize: "9px", fontWeight: "500", color: "#cbd5e1", fontStyle: "italic" }}>
+            Former Consultant at AIG, Hyderabad
+          </span>
+          <span style={{ fontSize: "11px", fontWeight: "500", color: "#cbd5e1", marginTop: "1px" }}>
             Consultant Gastroenterologist, Therapeutic Endoscopist & Liver Specialist
           </span>
         </div>

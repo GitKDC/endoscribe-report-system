@@ -5,6 +5,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, Legend, AreaChart, Area
 } from "recharts";
 import { FiActivity, FiPieChart, FiBarChart2, FiCalendar, FiUsers, FiMapPin, FiHeart, FiFilter } from "react-icons/fi";
+import { IoIosArrowDown } from "react-icons/io";
 
 const THEME = {
   navy:    "#1a3a52",
@@ -76,11 +77,16 @@ export default function AnalyticsPage() {
         
         {/* Filter Mockup */}
         <div style={{ display: "flex", gap: "12px" }}>
-          <select style={{ padding: "8px 16px", borderRadius: "8px", border: `1px solid ${THEME.border}`, background: "#fff", fontSize: "14px", fontWeight: 600 }}>
-            <option>All Time</option>
-            <option>This Month</option>
-            <option>Last 6 Months</option>
-          </select>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <select style={{ padding: "8px 16px", paddingRight: "32px", borderRadius: "8px", border: `1px solid ${THEME.border}`, background: "#fff", fontSize: "14px", fontWeight: 600, appearance: "none", cursor: "pointer" }}>
+              <option>All Time</option>
+              <option>This Month</option>
+              <option>Last 6 Months</option>
+            </select>
+            <div style={{ position: "absolute", right: "10px", pointerEvents: "none", display: "flex", color: THEME.muted }}>
+              <IoIosArrowDown size={14} />
+            </div>
+          </div>
           <button style={{ padding: "8px 16px", borderRadius: "8px", background: THEME.navy, color: "#fff", border: "none", display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>
             <FiFilter /> Filter
           </button>
@@ -143,7 +149,10 @@ export default function AnalyticsPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <RechartsTooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                <RechartsTooltip 
+                  formatter={(value: any, name: any, props: any) => [`${value} cases (${props.payload.percentage}%)`, name]}
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} 
+                />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }} />
               </PieChart>
             </ResponsiveContainer>

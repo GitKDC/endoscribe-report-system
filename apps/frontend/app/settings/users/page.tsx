@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FiTrash2, FiUserPlus, FiUser } from "react-icons/fi";
+import { FiTrash2, FiUserPlus, FiUser, FiEye, FiEyeOff } from "react-icons/fi";
 import { Button } from "../../../components/ui/Button";
 
 type User = {
@@ -28,6 +28,7 @@ export default function UserManagementPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("user");
   const [error, setError] = useState("");
 
@@ -73,12 +74,12 @@ export default function UserManagementPage() {
     }
     
     try {
-      const res = await (window as any).api.createUser(username.trim(), password, role);
+      const res = await (window as any).api.createUser(username.trim(), password, "user");
       if (res.success) {
         setShowModal(false);
         setUsername("");
         setPassword("");
-        setRole("user");
+        setShowPassword(false);
         fetchUsers();
       } else {
         setError(res.message);
@@ -132,7 +133,6 @@ export default function UserManagementPage() {
           <thead>
             <tr style={{ background: THEME.bg, borderBottom: `1px solid ${THEME.border}` }}>
               <th style={{ padding: "16px", color: THEME.navy, fontWeight: "600", fontSize: "14px" }}>User</th>
-              <th style={{ padding: "16px", color: THEME.navy, fontWeight: "600", fontSize: "14px" }}>Role</th>
               <th style={{ padding: "16px", color: THEME.navy, fontWeight: "600", fontSize: "14px", width: "80px", textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
@@ -152,16 +152,6 @@ export default function UserManagementPage() {
                     <div style={{ fontWeight: "600", color: THEME.text }}>{u.username}</div>
                   </div>
                 </td>
-                <td style={{ padding: "16px" }}>
-                  <span style={{
-                    padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600",
-                    background: u.role === "admin" ? "#e0e7ff" : THEME.bg,
-                    color: u.role === "admin" ? "#4338ca" : THEME.muted,
-                    textTransform: "capitalize"
-                  }}>
-                    {u.role}
-                  </span>
-                </td>
                 <td style={{ padding: "16px", textAlign: "center" }}>
                   <Button 
                     variant="danger" 
@@ -176,7 +166,7 @@ export default function UserManagementPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ padding: "32px", textAlign: "center", color: THEME.muted }}>
+                <td colSpan={2} style={{ padding: "32px", textAlign: "center", color: THEME.muted }}>
                   No users found.
                 </td>
               </tr>
@@ -214,24 +204,21 @@ export default function UserManagementPage() {
               
               <div>
                 <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: THEME.text }}>Password</label>
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${THEME.border}`, boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: "600", color: THEME.text }}>Role</label>
-                <select 
-                  value={role} 
-                  onChange={e => setRole(e.target.value)}
-                  style={{ width: "100%", padding: "10px", borderRadius: "8px", border: `1px solid ${THEME.border}`, boxSizing: "border-box" }}
-                >
-                  <option value="user">User (Doctor/Staff)</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)}
+                    style={{ width: "100%", padding: "10px", paddingRight: "40px", borderRadius: "8px", border: `1px solid ${THEME.border}`, boxSizing: "border-box" }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ position: "absolute", right: "10px", background: "none", border: "none", color: THEME.muted, cursor: "pointer", display: "flex" }}
+                  >
+                    {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>

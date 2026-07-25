@@ -33,9 +33,6 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
 
   const navItems = [...NAV];
-  if (user?.role === "admin") {
-    // Admin user tab is now handled inside the Settings layout
-  }
 
   return (
     <>
@@ -155,9 +152,6 @@ export default function Sidebar() {
             <div style={{ flex: 1, overflow: "hidden" }}>
               <div style={{ fontWeight: "600", color: "rgba(255, 255, 255, 0.95)", fontSize: "13px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
                 {user?.username}
-              </div>
-              <div style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.7)", marginTop: "2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", textTransform: "capitalize" }}>
-                {user?.role}
               </div>
             </div>
           </div>

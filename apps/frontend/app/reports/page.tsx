@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import ReportPreview from "../../components/ReportPreview";
 import { IoMdEye, IoIosArrowDown } from "react-icons/io";
 import { SlCalender } from "react-icons/sl";
-import { FiSearch, FiEdit2, FiTrash2, FiMessageSquare } from "react-icons/fi";
+import { FiSearch, FiEdit2, FiTrash2, FiMessageSquare, FiRefreshCw } from "react-icons/fi";
 import { MdPrint, MdPictureAsPdf, MdDownload } from "react-icons/md";
 import { generatePDF } from "../../utils/reportGenerator";
 import { buildEndoUrl } from "../../utils/buildEndoUrl";
@@ -27,6 +27,15 @@ export default function ReportsPage() {
 
   const [doctors, setDoctors] = useState<any[]>([]);
 
+  const resetFilters = () => {
+    setSearch("");
+    setStartDate("");
+    setEndDate("");
+    setProcedure("All");
+    setDoctorId("All");
+    setPage(1);
+  };
+
   // View modal state
   const [selectedReport, setSelectedReport] = useState<any>(null);
 
@@ -37,8 +46,9 @@ export default function ReportsPage() {
   const [whatsappModalReport, setWhatsappModalReport] = useState<any>(null);
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [whatsappDoctorPhone, setWhatsappDoctorPhone] = useState("");
+  const [whatsappSelfPhone, setWhatsappSelfPhone] = useState("");
   const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
-  const [sendingTarget, setSendingTarget] = useState<"patient" | "doctor" | null>(null);
+  const [sendingTarget, setSendingTarget] = useState<"patient" | "doctor" | "self" | null>(null);
 
   const fetchReports = async () => {
     if (!(window as any).api) return;
@@ -140,13 +150,21 @@ export default function ReportsPage() {
       setWhatsappModalReport(data);
       setWhatsappPhone(data.patient_phone || data.phone || "");
       setWhatsappDoctorPhone(data.referral_doctor_phone || "");
+      setWhatsappSelfPhone(localStorage.getItem("whatsapp_self_phone") || "");
     } catch (err) {
       alert("Failed to fetch report details");
     }
   };
 
-  const submitSendWhatsapp = async (target: "patient" | "doctor") => {
-    const targetPhone = target === "patient" ? whatsappPhone : whatsappDoctorPhone;
+  const submitSendWhatsapp = async (target: "patient" | "doctor" | "self") => {
+    let targetPhone = "";
+    if (target === "patient") targetPhone = whatsappPhone;
+    else if (target === "doctor") targetPhone = whatsappDoctorPhone;
+    else if (target === "self") {
+      targetPhone = whatsappSelfPhone;
+      localStorage.setItem("whatsapp_self_phone", whatsappSelfPhone); // Remember for next time
+    }
+    
     if (!targetPhone) return alert("Please enter a phone number");
     setIsSendingWhatsapp(true);
     setSendingTarget(target);
@@ -167,7 +185,8 @@ export default function ReportsPage() {
         );
 
         if (pdfResult && pdfResult.absolutePath) {
-          const isDoctor = target === "doctor";
+          // Both "doctor" and "self" are treated as a doctor for the message template
+          const isDoctor = target === "doctor" || target === "self";
           
           const reportData = {
             patientName: whatsappModalReport.patient_name,
@@ -181,7 +200,7 @@ export default function ReportsPage() {
             alert(`WhatsApp message sent successfully to ${target}!`);
             if (target === "patient") setWhatsappPhone("");
             if (target === "doctor") setWhatsappDoctorPhone("");
-            // Keep modal open so they can send to the other if they want, unless both are done
+            // Keep modal open so they can send to others if they want
           } else {
             alert("Failed to send WhatsApp: " + sendRes.message);
           }
@@ -288,6 +307,17 @@ export default function ReportsPage() {
           </select>
           <div style={{ position: "absolute", right: "10px", pointerEvents: "none", color: "#0d9488", display: "flex" }}><IoIosArrowDown size={14} /></div>
         </div>
+        
+        <div style={{ display: "flex", alignItems: "center", marginLeft: "auto" }}>
+          <Button 
+            variant="secondary"
+            onClick={resetFilters}
+            title="Reset Filters"
+            style={{ padding: "8px 12px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <FiRefreshCw size={16} style={{ color: "#64748b" }} />
+          </Button>
+        </div>
       </div>
 
       {/* TABLE */}
@@ -300,7 +330,7 @@ export default function ReportsPage() {
             ) : (
               reports.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell style={{ fontWeight: "600", color: "#333" }}>{r.report_number || "-"}</TableCell>
+                  <TableCell style={{ fontWeight: "600", color: "#333", whiteSpace: "nowrap" }}>{r.report_number || "-"}</TableCell>
                   <TableCell style={{ fontWeight: "500", color: "#111" }}>{r.patient_prefix} {r.patient_name}</TableCell>
                   <TableCell style={{ color: "#007bff", fontWeight: "600" }}>{r.report_type}</TableCell>
                   <TableCell>{r.doctor_name || "-"}</TableCell>
@@ -462,6 +492,29 @@ export default function ReportsPage() {
                       disabled={isSendingWhatsapp || !whatsappDoctorPhone}
                     >
                       {sendingTarget === "doctor" ? "Sending..." : "Send"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {whatsappModalReport.doctor_name && (
+                <div style={{ padding: "16px", border: "1px solid #e2e8f0", borderRadius: "12px", background: "#f8fafc" }}>
+                  <h4 style={{ margin: "0 0 12px", color: "#1e293b", fontSize: "14px" }}>Send to Self ({whatsappModalReport.doctor_name})</h4>
+                  <div style={{ display: "flex", gap: "12px" }}>
+                    <input 
+                      type="text" 
+                      value={whatsappSelfPhone} 
+                      onChange={e => setWhatsappSelfPhone(e.target.value)}
+                      placeholder="Your Phone (e.g. 919876543210)"
+                      style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                    />
+                    <Button 
+                      variant="primary" 
+                      style={{ background: "#8b5cf6", borderColor: "#8b5cf6", padding: "8px 16px" }} 
+                      onClick={() => submitSendWhatsapp("self")} 
+                      disabled={isSendingWhatsapp || !whatsappSelfPhone}
+                    >
+                      {sendingTarget === "self" ? "Sending..." : "Send"}
                     </Button>
                   </div>
                 </div>

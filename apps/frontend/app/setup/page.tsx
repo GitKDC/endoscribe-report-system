@@ -65,8 +65,8 @@ export default function SetupWizard() {
         
         {step === 1 && (
           <div style={{ animation: "fadeIn 0.5s" }}>
-            <div style={{ width: "64px", height: "64px", background: THEME.teal, borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "24px" }}>
-              <FiShield size={32} color="#fff" />
+            <div style={{ marginBottom: "24px", display: "flex" }}>
+              <img src="/es-logo.svg" alt="EndoScribe Logo" style={{ width: "80px", height: "auto", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
             </div>
             <h1 style={{ margin: "0 0 12px 0", color: THEME.navyDark, fontSize: "28px", fontWeight: "800" }}>Welcome to EndoScribe</h1>
             <p style={{ color: THEME.muted, fontSize: "15px", lineHeight: "1.6", marginBottom: "32px" }}>
@@ -88,13 +88,13 @@ export default function SetupWizard() {
               Choose where to securely store your clinical database, patient images, and exports. You can change this anytime later.
             </p>
             
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px" }}>
-              {['database', 'images', 'reports', 'backups'].map(key => (
-                <div key={key}>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: THEME.navy, textTransform: "capitalize", marginBottom: "6px" }}>{key} Directory</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px", alignItems: "center" }}>
+              {['database', 'images', 'reports', 'backups', 'exports'].map(key => (
+                <div key={key} style={{ width: "100%", maxWidth: "500px" }}>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: THEME.navy, textTransform: "capitalize", marginBottom: "6px", textAlign: "left" }}>{key} Directory</label>
                   <div style={{ display: "flex", gap: "12px" }}>
-                    <div style={{ flex: 1, padding: "10px 14px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: "8px", fontSize: "13px", color: THEME.text }}>
-                      {config.storagePaths[key]}
+                    <div style={{ flex: 1, padding: "10px 14px", background: THEME.bg, border: `1px solid ${THEME.border}`, borderRadius: "8px", fontSize: "13px", color: THEME.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {config.storagePaths[key] || "Not Set"}
                     </div>
                     <button onClick={() => handleSelectFolder(key)} style={{ padding: "0 16px", background: THEME.white, border: `1px solid ${THEME.border}`, borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600", fontSize: "13px", color: THEME.navy }}>
                       <FiFolder /> Browse
