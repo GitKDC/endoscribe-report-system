@@ -6,6 +6,7 @@ import ReportForm from "@/components/ReportForm";
 import ImageUploader from "@/components/ImageUploader";
 import ReportPreview from "@/components/ReportPreview";
 import { generatePDF, printReport, exportAsImage } from "@/utils/reportGenerator";
+import { buildEndoUrl } from "@/utils/buildEndoUrl";
 import { FiPrinter, FiDownload, FiImage, FiRefreshCw, FiEdit3, FiAlertTriangle } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ function CreateReportInner() {
 
   const searchParams = useSearchParams();
   const initType = searchParams?.get("type") || "UGI";
+  const editId = searchParams?.get("editId");
 
   // ── Report fields ───────────────────────────────────────────────────────────
   const [patientName, setPatientName] = useState("");
@@ -101,6 +103,7 @@ function CreateReportInner() {
   const [referralName, setReferralName] = useState("");
   const [referralId, setReferralId] = useState<number | null>(null);
   const [referralPhone, setReferralPhone] = useState("");
+  const [templateId, setTemplateId] = useState<number | null>(null);
 
   // ── Master Image Adjustments ────────────────────────────────────────────────
   const [masterBrightness, setMasterBrightness] = useState(120);
@@ -121,10 +124,80 @@ function CreateReportInner() {
     { title: string; content: string; highlight?: boolean }[]
   >([]);
 
-  // ── Auto-Save Draft ──────────────────────────────────────────────────────────
+  // ── Auto-Save Draft & Edit Mode Initialization ───────────────────────────────
   const [isDraftRestored, setIsDraftRestored] = useState(false);
+  const [isEditModeLoaded, setIsEditModeLoaded] = useState(false);
 
   useEffect(() => {
+    const initEditMode = async () => {
+      if (editId && (window as any).api) {
+        try {
+          setLoading(true);
+          const report = await (window as any).api.getReport(parseInt(editId, 10));
+          if (report) {
+            setPatientName(report.patient_name || "");
+            setPatientId(report.patient_id || null);
+            setPatientPhone(report.patient_phone || "");
+            if (report.age) {
+              setPatientAge(`${report.age}Yrs/${report.gender || "M"}`);
+            } else {
+              setPatientAge("");
+            }
+            setPatientCity(report.city || "");
+            // Extract YYYY-MM-DD from created_at
+            if (report.created_at) {
+               setReportDate(new Date(report.created_at).toISOString().split('T')[0]);
+            }
+            setReportType(report.report_type || "UGI");
+            setPrefix(report.patient_prefix || "Mr.");
+            setReferralName(report.referral_name || "");
+            setReferralId(report.referral_doctor_id || null);
+            setReferralPhone(report.referral_doctor_phone || "");
+            setTemplateId(report.template_id || null);
+            
+            if (report.doctor_ids) {
+               setSelectedDoctorIds(JSON.parse(report.doctor_ids));
+            } else if (report.doctor_id) {
+               setSelectedDoctorIds([report.doctor_id]);
+            }
+
+            if (report.sections) {
+               setSections(report.sections);
+            }
+            
+            if (report.images) {
+               setImages(report.images.map((img: any) => ({
+                 id: img.id.toString(),
+                 url: buildEndoUrl(img.file_path),
+                 filePath: img.file_path,
+                 label: "Image",
+                 isNbi: !!img.nbi_label,
+                 nbiLabel: img.nbi_label || "",
+                 brightness: img.brightness ?? 120,
+                 contrast: img.contrast ?? 120,
+               })));
+            }
+            
+            setReportNumber(report.report_number);
+          }
+        } catch (e) {
+          console.error("Failed to load edit report:", e);
+          setLoadError("Failed to load report for editing");
+        } finally {
+          setIsEditModeLoaded(true);
+          setLoading(false);
+        }
+      } else {
+        setIsEditModeLoaded(true);
+      }
+    };
+    initEditMode();
+  }, [editId]);
+
+  useEffect(() => {
+    // Only restore draft if we are NOT in edit mode
+    if (editId) return;
+
     try {
       const draftStr = localStorage.getItem("endoscribe_draft_report");
       if (draftStr) {
@@ -148,9 +221,10 @@ function CreateReportInner() {
     } finally {
       setIsDraftRestored(true);
     }
-  }, []);
+  }, [editId]);
 
   useEffect(() => {
+    if (editId) return; // Do NOT auto-save drafts while editing an existing report
     if (!isDraftRestored) return;
     const hasData = patientName || patientPhone || (sections.length > 0 && sections.some(s => s.content.trim() !== ""));
     if (!hasData) return;
@@ -162,7 +236,7 @@ function CreateReportInner() {
     });
     localStorage.setItem("endoscribe_draft_report", draftStr);
   }, [
-    isDraftRestored,
+    isDraftRestored, editId,
     patientName, patientId, patientPhone, patientAge, patientCity,
     reportDate, reportType, prefix, referralName, referralId, referralPhone,
     selectedDoctorIds, sections
@@ -231,6 +305,7 @@ function CreateReportInner() {
   // ── Report type change — auto-fills with category default sections
   const handleReportTypeChange = (val: string) => {
     setReportType(val);
+    setTemplateId(null);
     const cat = categories.find(c => c.name === val);
     if (cat) {
       setSections([...cat.default_sections]);
@@ -382,7 +457,43 @@ function CreateReportInner() {
     if (!(window as any).api) {
       // running in browser dev mode — skip DB save
       savedReportNo = null;
+    } else if (editId) {
+      // Editing existing report: always update the database
+      try {
+        const primaryDoctorId = selectedDoctorIds[0] ?? null;
+        const saved = await (window as any).api.updateReport({
+          id: parseInt(editId, 10),
+          data: {
+            patientId,
+            patientPrefix: prefix,
+            patientName,
+            patientPhone,
+            age: patientAge ? parseInt(patientAge) : null,
+            patientCity,
+            gender:   patientAge?.includes("/F") ? "F" : "M",
+            doctorId: primaryDoctorId,
+            doctorIds: selectedDoctorIds,
+            referralDoctorId: referralId,
+            referralDoctorName: referralName,
+            referralDoctorPhone: referralPhone,
+            templateId,
+            reportType,
+            sections,
+            images: finalImages.map((img, i) => ({
+              filePath: img.filePath,
+              position: i,
+              nbiLabel: img.nbiLabel || null,
+              brightness: masterBrightness,
+              contrast: masterContrast,
+            })),
+          }
+        });
+        savedReportNo = saved?.reportNumber ?? reportNumber;
+      } catch (updateErr) {
+        console.error("DB update failed (non-fatal):", updateErr);
+      }
     } else if (!savedReportNo) {
+      // Creating new report
       try {
         const primaryDoctorId = selectedDoctorIds[0] ?? null;
         const saved = await (window as any).api.saveReport({
@@ -398,6 +509,7 @@ function CreateReportInner() {
           referralDoctorId: referralId,
           referralDoctorName: referralName,
           referralDoctorPhone: referralPhone,
+          templateId,
           reportType,
           sections,
           images: finalImages.map((img, i) => ({
@@ -549,7 +661,7 @@ function CreateReportInner() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "22px" }}>
               <FiEdit3 size={24} color="#1a3a52" />
               <h2 style={{ color: "#1a3a52", margin: 0, fontSize: "20px", fontWeight: "700", fontFamily: "'Inter', sans-serif" }}>
-                EndoScribe: Endoscopy Report Generator 
+                {editId ? `Editing Report: ${reportNumber || ''}` : 'EndoScribe: Endoscopy Report Generator'}
               </h2>
             </div>
 
@@ -595,6 +707,7 @@ function CreateReportInner() {
               onPatientCityChange={setPatientCity}
               onReportDateChange={setReportDate}
               onReportTypeChange={handleReportTypeChange}
+              templateId={templateId}
               onTemplateSelect={handleTemplateSelect}
               prefix={prefix}
               setPrefix={setPrefix}

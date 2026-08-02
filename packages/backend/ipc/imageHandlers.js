@@ -38,6 +38,62 @@ function registerImageHandlers() {
       throw err;
     }
   });
+  ipcMain.handle("get-previous-images", async (_, { search, procedureFilter, page = 1, limit = 50 }) => {
+    try {
+      console.log("📸 get-previous-images called");
+      const db = require("../db/db");
+      return new Promise((resolve, reject) => {
+        const offset = (page - 1) * limit;
+        
+        let query = `
+          SELECT i.id, i.file_path, i.nbi_label, i.brightness, i.contrast, 
+                 r.patient_name, r.report_type, r.created_at, r.report_number
+          FROM images i
+          JOIN reports r ON i.report_id = r.id
+          WHERE 1=1
+        `;
+        let countQuery = `
+          SELECT COUNT(*) as total
+          FROM images i
+          JOIN reports r ON i.report_id = r.id
+          WHERE 1=1
+        `;
+        const params = [];
+
+        if (procedureFilter && procedureFilter !== "All") {
+          query += ` AND r.report_type = ?`;
+          countQuery += ` AND r.report_type = ?`;
+          params.push(procedureFilter);
+        }
+
+        if (search) {
+          query += ` AND (r.patient_name LIKE ? OR r.sections LIKE ?)`;
+          countQuery += ` AND (r.patient_name LIKE ? OR r.sections LIKE ?)`;
+          params.push(`%${search}%`, `%${search}%`);
+        }
+
+        query += ` ORDER BY r.created_at DESC LIMIT ? OFFSET ?`;
+        
+        db.get(countQuery, params, (err, row) => {
+          if (err) return reject(err);
+          const totalItems = row.total;
+          
+          db.all(query, [...params, limit, offset], (err, rows) => {
+            if (err) return reject(err);
+            resolve({
+              data: rows,
+              totalItems,
+              totalPages: Math.ceil(totalItems / limit),
+              currentPage: page
+            });
+          });
+        });
+      });
+    } catch (err) {
+      console.error("❌ Failed to get previous images:", err);
+      throw err;
+    }
+  });
 }
 
-module.exports = { registerImageHandlers }; // ✅ THIS IS THE FIX
+module.exports = { registerImageHandlers };

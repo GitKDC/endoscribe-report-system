@@ -41,8 +41,10 @@ contextBridge.exposeInMainWorld("api", {
   // Generate (returns sections for live preview — does NOT save to DB)
   generateReport: async (data) => ipcRenderer.invoke("generate-report", data),
   saveImage: async (data) => ipcRenderer.invoke("save-image", data),
+  getPreviousImages: async (filters) => ipcRenderer.invoke("get-previous-images", filters),
   // Save to DB right before PDF export — returns { id, reportNumber }
   saveReport:    async (data)  => ipcRenderer.invoke("save-report", data),
+  updateReport:  async (data)  => ipcRenderer.invoke("update-report", data),
   saveReportPdf: async (data)  => ipcRenderer.invoke("save-report-pdf", data),
 
   // ─── DASHBOARD APIs ────────────────────────────────────────────────────────

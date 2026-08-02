@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import ReportPreview from "../../components/ReportPreview";
 import { IoMdEye, IoIosArrowDown } from "react-icons/io";
 import { SlCalender } from "react-icons/sl";
@@ -12,6 +13,7 @@ import { Table, TableRow, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
@@ -340,6 +342,13 @@ export default function ReportsPage() {
                   <TableCell>
                     <div style={{ display: "flex", gap: "8px", marginLeft: "-8px" }}>
                       <Button variant="icon" size="sm" icon={<IoMdEye size={18} />} onClick={() => handleView(r.id)} />
+                      <Button 
+                        variant="icon" 
+                        size="sm" 
+                        icon={<FiEdit2 size={18} />} 
+                        onClick={() => router.push(`/create-report?editId=${r.id}`)}
+                        style={{ color: "#d97706" }}
+                      />
                       <Button 
                         variant="icon" 
                         size="sm" 

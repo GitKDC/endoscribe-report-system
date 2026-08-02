@@ -1,5 +1,7 @@
-import React, { useRef } from "react";
-import { FiCamera } from "react-icons/fi";
+import React, { useRef, useState } from "react";
+import { FiCamera, FiSearch } from "react-icons/fi";
+import { MdDragIndicator } from "react-icons/md";
+import { PreviousImagePicker } from "./PreviousImagePicker";
 
 interface ImageData {
   id: string;
@@ -30,6 +32,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   maxImages = 6,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [draggedImgIdx, setDraggedImgIdx] = useState<number | null>(null);
+  const [dragOverImgIdx, setDragOverImgIdx] = useState<number | null>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = Array.from(e.target.files || []);
@@ -65,6 +70,25 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   }
 };
 
+  const handleImportOldImages = (importedImages: any[]) => {
+    const remainingSlots = maxImages - images.length;
+    const imagesToAdd = importedImages.slice(0, remainingSlots);
+    
+    const newImages: ImageData[] = imagesToAdd.map((img, i) => ({
+      id: crypto.randomUUID(),
+      url: `endo:///${img.file_path.replace(/\\/g, "/")}`, // Display locally using custom protocol
+      filePath: img.file_path, // Persist reference to existing file
+      label: `Image ${images.length + i + 1}`,
+      brightness: img.brightness || 100,
+      contrast: img.contrast || 100,
+      isNbi: !!img.nbi_label,
+      nbiLabel: img.nbi_label
+    }));
+
+    onImagesAdded(newImages);
+    setShowPicker(false);
+  };
+
   return (
     <div style={{ marginBottom: 20 }}>
       <h3 style={{ color: "#1a3a52", marginTop: 0, marginBottom: 12, fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 600, display: "flex", alignItems: "center" }}>
@@ -72,42 +96,96 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       </h3>
 
       {images.length < maxImages && (
-        <div
-          style={{
-            border: "2px dashed #007bff",
-            borderRadius: 6,
-            padding: 20,
-            textAlign: "center",
-            backgroundColor: "#f0f8ff",
-            cursor: "pointer",
-            marginBottom: 15,
-            fontFamily: "'Inter', sans-serif"
-          }}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileSelect}
-            style={{ display: "none" }}
-          />
-          <p style={{ margin: "0 0 5px 0", fontWeight: "bold", color: "#007bff" }}>
-            Click to upload up to 6 image(s)
-          </p>
-          <p style={{ margin: 0, color: "#666", fontSize: 12 }}>
-            or drag and drop PNG, JPG, JPEG images
-          </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "15px" }}>
+          <div
+            style={{
+              border: "2px dashed #007bff",
+              borderRadius: 6,
+              padding: 20,
+              textAlign: "center",
+              backgroundColor: "#f0f8ff",
+              cursor: "pointer",
+              fontFamily: "'Inter', sans-serif"
+            }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFileSelect}
+              style={{ display: "none" }}
+            />
+            <p style={{ margin: "0 0 5px 0", fontWeight: "bold", color: "#007bff" }}>
+              Click to upload up to 6 image(s)
+            </p>
+            <p style={{ margin: 0, color: "#666", fontSize: 12 }}>
+              or drag and drop PNG, JPG, JPEG images
+            </p>
+          </div>
+          
+          <button
+            onClick={() => setShowPicker(true)}
+            style={{
+              padding: "12px",
+              backgroundColor: "white",
+              border: "1px solid #ddd",
+              borderRadius: "6px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              color: "#333",
+              fontWeight: "bold",
+              fontSize: "13px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+            }}
+          >
+            <FiSearch color="#007bff" size={16} /> Browse Previous Reports
+          </button>
         </div>
       )}
 
       {images.length > 0 && (
         <div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+          <div 
+            style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggedImgIdx !== null && dragOverImgIdx !== null && draggedImgIdx !== dragOverImgIdx) {
+                const newImages = [...images];
+                const draggedItem = newImages[draggedImgIdx];
+                newImages.splice(draggedImgIdx, 1);
+                newImages.splice(dragOverImgIdx, 0, draggedItem);
+                onImagesUpdated(newImages);
+              }
+              setDraggedImgIdx(null);
+              setDragOverImgIdx(null);
+            }}
+          >
             {images.map((img, index) => (
               <div
                 key={img.id}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedImgIdx(index);
+                  e.dataTransfer.effectAllowed = "move";
+                  // transparent drag image so it doesn't look messy
+                  const dragGhost = document.createElement("div");
+                  e.dataTransfer.setDragImage(dragGhost, 0, 0);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverImgIdx(index);
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDragEnd={() => {
+                  setDraggedImgIdx(null);
+                  setDragOverImgIdx(null);
+                }}
                 style={{
                   display: "flex",
                   gap: 8,
@@ -116,8 +194,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   backgroundColor: "#f9f9f9",
                   borderRadius: 4,
                   borderLeft: "4px solid #007bff",
+                  borderTop: dragOverImgIdx === index ? "2px solid #007bff" : "none",
+                  opacity: draggedImgIdx === index ? 0.4 : 1,
+                  transition: "border 0.2s, opacity 0.2s",
                 }}
               >
+                <div style={{ cursor: "grab", color: "#adb5bd", padding: "0 4px", display: "flex", alignItems: "center" }}>
+                  <MdDragIndicator size={20} />
+                </div>
                 <img
                   src={img.url}
                   alt={img.label}
@@ -129,7 +213,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     border: "1px solid #ddd",
                   }}
                 />
-                <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 6, pointerEvents: draggedImgIdx !== null ? "none" : "auto" }}>
                   <input
                     type="text"
                     value={img.label}
@@ -166,42 +250,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   </div>
                 </div>
 
-
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  <button
-                    onClick={() => {
-                      if (index === 0) return;
-                      const newImages = [...images];
-                      [newImages[index], newImages[index - 1]] = [newImages[index - 1], newImages[index]];
-                      onImagesUpdated(newImages);
-                    }}
-                    disabled={index === 0}
-                    style={{
-                      padding: "4px 8px", backgroundColor: index === 0 ? "#e9ecef" : "#f8f9fa",
-                      border: "1px solid #ddd", borderRadius: 3, cursor: index === 0 ? "not-allowed" : "pointer",
-                      fontSize: 10, color: index === 0 ? "#adb5bd" : "#495057"
-                    }}
-                  >
-                    ▲
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (index === images.length - 1) return;
-                      const newImages = [...images];
-                      [newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]];
-                      onImagesUpdated(newImages);
-                    }}
-                    disabled={index === images.length - 1}
-                    style={{
-                      padding: "4px 8px", backgroundColor: index === images.length - 1 ? "#e9ecef" : "#f8f9fa",
-                      border: "1px solid #ddd", borderRadius: 3, cursor: index === images.length - 1 ? "not-allowed" : "pointer",
-                      fontSize: 10, color: index === images.length - 1 ? "#adb5bd" : "#495057"
-                    }}
-                  >
-                    ▼
-                  </button>
-                </div>
-
                 <button
                   onClick={() => onImageRemoved(img.id)}
                   style={{
@@ -222,6 +270,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {showPicker && (
+        <PreviousImagePicker 
+          onClose={() => setShowPicker(false)}
+          onImport={handleImportOldImages}
+        />
       )}
     </div>
   );

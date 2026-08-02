@@ -179,6 +179,165 @@ const saveReport = async (data) => {
   });
 };
 
+// ─── Update an existing report ───────────────────────────────────────────────
+const updateReport = async (reportId, data) => {
+  let {
+    patientId,
+    patientPrefix = "Mr.",
+    patientName,
+    patientPhone,
+    age,
+    gender,
+    doctorId,
+    referralDoctorId,
+    referralDoctorName,
+    referralDoctorPhone,
+    templateId,
+    reportType,
+    sections,
+    images = [] 
+  } = data;
+
+  // 🔥 Auto-create or Update patient
+  if (patientName) {
+    try {
+      const existingPatient = await new Promise((res, rej) => {
+        if (patientId) {
+           db.get("SELECT id FROM patients WHERE id = ?", [patientId], (err, row) => err ? rej(err) : res(row));
+        } else {
+           db.get("SELECT id FROM patients WHERE name = ? COLLATE NOCASE", [patientName.trim()], (err, row) => err ? rej(err) : res(row));
+        }
+      });
+
+      if (existingPatient) {
+        patientId = existingPatient.id;
+        await new Promise((res, rej) => {
+          db.run(
+            "UPDATE patients SET name = ?, phone = ?, age = ?, gender = ? WHERE id = ?",
+            [patientName.trim(), patientPhone || null, age || null, gender || "M", patientId],
+            (err) => err ? rej(err) : res()
+          );
+        });
+      } else {
+        await new Promise((res, rej) => {
+          db.run(
+            "INSERT INTO patients (name, phone, age, gender) VALUES (?, ?, ?, ?)",
+            [patientName.trim(), patientPhone || null, age || null, gender || "M"],
+            function (err) {
+              if (err) return rej(err);
+              patientId = this.lastID;
+              res();
+            }
+          );
+        });
+      }
+    } catch (err) {
+      console.error("Failed to auto-create/update patient:", err);
+    }
+  }
+
+  // 🔥 Auto-create or Update referral doctor
+  if (referralDoctorName) {
+    try {
+      const existingReferral = await new Promise((res, rej) => {
+        if (referralDoctorId) {
+          db.get("SELECT id FROM referral_doctors WHERE id = ?", [referralDoctorId], (err, row) => err ? rej(err) : res(row));
+        } else {
+          db.get("SELECT id FROM referral_doctors WHERE name = ? COLLATE NOCASE", [referralDoctorName.trim()], (err, row) => err ? rej(err) : res(row));
+        }
+      });
+
+      if (existingReferral) {
+        referralDoctorId = existingReferral.id;
+        await new Promise((res, rej) => {
+          db.run(
+            "UPDATE referral_doctors SET name = ?, phone = ? WHERE id = ?",
+            [referralDoctorName.trim(), referralDoctorPhone || null, referralDoctorId],
+            (err) => err ? rej(err) : res()
+          );
+        });
+      } else {
+        await new Promise((res, rej) => {
+          db.run(
+            "INSERT INTO referral_doctors (name, phone) VALUES (?, ?)",
+            [referralDoctorName.trim(), referralDoctorPhone || null],
+            function (err) {
+              if (err) return rej(err);
+              referralDoctorId = this.lastID;
+              res();
+            }
+          );
+        });
+      }
+    } catch (err) {
+      console.error("Failed to auto-create/update referral doctor:", err);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    db.run(
+      `UPDATE reports SET
+         patient_prefix = ?, patient_name = ?, age = ?, gender = ?,
+         doctor_id = ?, doctor_ids = ?, template_id = ?, report_type = ?, sections = ?,
+         patient_id = ?, referral_doctor_id = ?, patient_phone = ?, referral_doctor_phone = ?
+       WHERE id = ?`,
+      [
+        patientPrefix,
+        patientName,
+        age,
+        gender,
+        doctorId || null,
+        data.doctorIds ? JSON.stringify(data.doctorIds) : null,
+        templateId || null,
+        reportType || "UPPER GI ENDOSCOPY",
+        JSON.stringify(sections || []),
+        patientId || null,
+        referralDoctorId || null,
+        patientPhone || null,
+        referralDoctorPhone || null,
+        reportId
+      ],
+      async function (err) {
+        if (err) return reject(err);
+
+        // Fetch report_number for return value
+        const reportNumber = await new Promise((res, rej) => {
+          db.get("SELECT report_number FROM reports WHERE id = ?", [reportId], (e, r) => e ? rej(e) : res(r?.report_number));
+        });
+
+        // 1. Delete all existing images
+        await new Promise((res, rej) => {
+          db.run("DELETE FROM images WHERE report_id = ?", [reportId], (e) => e ? rej(e) : res());
+        });
+
+        // 2. Insert the new images
+        const stmt = db.prepare(
+          "INSERT INTO images (report_id, file_path, position, nbi_label, brightness, contrast) VALUES (?, ?, ?, ?, ?, ?)"
+        );
+
+        images.forEach((img, index) => {
+          const finalPath = img.relativePath ? img.relativePath : img.filePath;
+          if (finalPath && finalPath.trim() !== "") {
+            stmt.run(reportId, finalPath, index, img.nbiLabel || null, img.brightness ?? 70, img.contrast ?? 70);
+          }
+        });
+
+        stmt.finalize();
+
+        // 3. Delete existing diseases
+        await new Promise((res, rej) => {
+          db.run("DELETE FROM report_diseases WHERE report_id = ?", [reportId], (e) => e ? rej(e) : res());
+        });
+
+        // 4. Re-trigger analytics
+        parseReportDiseases(reportId, patientId, sections);
+
+        resolve({ id: reportId, reportNumber });
+      }
+    );
+  });
+};
+
 // ─── Get all reports (list view with pagination & filters) ─────────────────────
 const getAllReports = (filters = {}) => {
   return new Promise((resolve, reject) => {
@@ -367,4 +526,4 @@ const saveReportPdf = (reportNumber, base64Data, filename) => {
   });
 };
 
-module.exports = { saveReport, getAllReports, getReport, generateReportNumber, getSetting, setSetting, saveReportPdf };
+module.exports = { saveReport, updateReport, getAllReports, getReport, generateReportNumber, getSetting, setSetting, saveReportPdf };

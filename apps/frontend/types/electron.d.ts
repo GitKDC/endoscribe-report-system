@@ -27,6 +27,7 @@ declare global {
 
       // REPORT
       generateReport: (data: any) => Promise<any>;
+      getPreviousImages: (filters: { search?: string, procedureFilter?: string, page?: number, limit?: number }) => Promise<{ data: any[], totalItems: number, totalPages: number, currentPage: number }>;
 
       // HELPER
       isElectron: () => boolean;

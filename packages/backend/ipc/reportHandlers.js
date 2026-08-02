@@ -5,6 +5,7 @@ const { getTemplate } = require("../repositories/templateRepo");
 const { generateReport } = require("../services/reportService");
 const {
   saveReport,
+  updateReport,
   getAllReports,
   getReport,
   getSetting,
@@ -35,6 +36,19 @@ const registerReportHandlers = () => {
       return result; // { id, reportNumber }
     } catch (error) {
       console.error("❌ Error saving report:", error);
+      throw error;
+    }
+  });
+
+  // ── Update existing report ────────────────────────────────────────────────
+  ipcMain.handle("update-report", async (_, { id, data }) => {
+    try {
+      console.log("📨 IPC HIT: update-report", id, data?.patientName);
+      const result = await updateReport(id, data);
+      console.log("✅ Report updated:", result.reportNumber);
+      return result; // { id, reportNumber }
+    } catch (error) {
+      console.error("❌ Error updating report:", error);
       throw error;
     }
   });

@@ -94,7 +94,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
   const approxLines = visibleSections.reduce(
     (sum, s) => {
       const explicitNewlines = (s.content?.match(/\n/g) || []).length;
-      const wrappedLines = Math.floor((s.content?.length || 0) / 60);
+      const wrappedLines = Math.floor((s.content?.length || 0) / 75);
       return sum + explicitNewlines + wrappedLines + 1; // +1 for the title/base line
     },
     0
@@ -112,11 +112,11 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
 
   // Bottom images take up ~190px of vertical space. 
   // We add an "effective line" penalty so the font shrinks earlier when bottom images are present.
-  const effectiveLines = approxLines + (bottomImages.length > 0 ? 8 : 0);
+  const effectiveLines = approxLines + (bottomImages.length > 0 ? 10 : 0);
 
-  const bodyFont = effectiveLines > 28 || totalLen > 1100 ? "13px" : effectiveLines > 24 || totalLen > 900 ? "14px" : effectiveLines > 19 || totalLen > 700 ? "15px" : "16px";
-  const lineH    = effectiveLines > 28 || totalLen > 1100 ? 1.35   : effectiveLines > 24 || totalLen > 900 ? 1.4    : effectiveLines > 19 || totalLen > 700 ? 1.4    : 1.45;
-  const paraGap  = effectiveLines > 28 || totalLen > 1100 ? "4px"  : effectiveLines > 24 || totalLen > 900 ? "6px"  : effectiveLines > 19 || totalLen > 700 ? "8px"  : "10px";
+  const bodyFont = effectiveLines > 40 || totalLen > 1800 ? "13px" : effectiveLines > 32 || totalLen > 1400 ? "14px" : effectiveLines > 26 || totalLen > 1100 ? "15px" : effectiveLines > 22 || totalLen > 900 ? "16px" : effectiveLines > 18 || totalLen > 700 ? "17px" : "18px";
+  const lineH    = effectiveLines > 40 || totalLen > 1800 ? 1.35   : effectiveLines > 32 || totalLen > 1400 ? 1.4    : effectiveLines > 26 || totalLen > 1100 ? 1.4    : effectiveLines > 22 || totalLen > 900 ? 1.45   : effectiveLines > 18 || totalLen > 700 ? 1.5    : 1.5;
+  const paraGap  = effectiveLines > 40 || totalLen > 1800 ? "4px"  : effectiveLines > 32 || totalLen > 1400 ? "6px"  : effectiveLines > 26 || totalLen > 1100 ? "8px"  : effectiveLines > 22 || totalLen > 900 ? "10px" : effectiveLines > 18 || totalLen > 700 ? "12px" : "14px";
 
   const displayTitle = REPORT_TITLE_MAP[reportType] || reportType || "UPPER GI ENDOSCOPY";
 
@@ -245,14 +245,15 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         {/* Content split (Left / Right) */}
-        <div style={{ display: "flex", gap: "8px", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", gap: "12px", flex: 1, minHeight: 0, overflow: "hidden" }}>
           {/* ── LEFT: title + text + bottom images ────────── */}
           <div
             style={{
-              flex: "1 1 57%",
+              flex: "1 1 66%",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
+              minHeight: 0,
               fontSize: bodyFont,
               lineHeight: lineH,
             }}
@@ -262,7 +263,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
             <h2
               style={{
                 margin: 0,
-                fontSize: "15px",
+                fontSize: "19px",
                 fontWeight: "800",
                 textTransform: "uppercase",
                 display: "inline-block",
@@ -276,7 +277,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
           </div>
 
           {/* Clinical text */}
-          <div style={{ flex: 1, overflow: "hidden" }}>
+          <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
             {visibleSections.map((section, index) =>
               section.isHeading ? (
                 <div
@@ -393,7 +394,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         {rightImages.length > 0 && (
           <div
             style={{
-              flex: "0 0 40%",
+              flex: "0 0 32%",
               display: "flex",
               flexDirection: "column",
               gap: "6px",
@@ -408,10 +409,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                   height: "calc((100% - 18px) / 4)",
                   minHeight: 0,
                   display: "flex",
-                  justifyContent: "flex-end",
+                  justifyContent: "center",
                 }}
               >
-                <div style={{ position: "relative", width: "80%", height: "100%", overflow: "hidden" }}>
+                <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
                   <img
                     src={img.url}
                     alt={img.label}

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "./ui/Button";
 import { FiEye, FiEyeOff } from "react-icons/fi";
@@ -17,6 +18,7 @@ const THEME = {
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const router = useRouter();
   const [isFirstTime, setIsFirstTime] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -72,6 +74,7 @@ export default function LoginScreen() {
         const res = await (window as any).api.createUser(username.trim(), password, "user");
         if (res.success) {
           login(res.data);
+          router.push("/");
         } else {
           setError(res.message || "Failed to create admin user");
         }
@@ -79,6 +82,7 @@ export default function LoginScreen() {
         const res = await (window as any).api.login(username.trim(), password);
         if (res.success) {
           login(res.data);
+          router.push("/");
         } else {
           setError(res.message || "Invalid username or password");
         }

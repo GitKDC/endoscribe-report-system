@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { IoIosArrowDown } from "react-icons/io";
 import { SlCalender } from "react-icons/sl";
 import { FiPlus, FiX, FiKey, FiUser, FiFileText, FiActivity } from "react-icons/fi";
+import { MdDragIndicator } from "react-icons/md";
 
 const THEME = {
   navy:    "#1a3a52",
@@ -59,6 +60,7 @@ interface ReportFormProps {
   onReportDateChange:  (v: string) => void;
   onReportTypeChange:  (v: string) => void;
   onTemplateSelect:    (templateId: number) => void;
+  templateId?:         number | null;
   setPrefix:           (v: string) => void;
   referralName:        string;
   onReferralNameChange: (v: string) => void;
@@ -72,7 +74,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
   doctorName, sections, setSections, templates, onReportTypeChange,
   doctors, categories, onDoctorsChange, selectedDoctorIds, onDoctorSelectionChange,
   onPatientNameChange, onPatientPhoneChange, onPatientIdChange, onPatientAgeChange, onPatientCityChange,
-  onReportDateChange, onTemplateSelect, setPrefix,
+  onReportDateChange, onTemplateSelect, templateId, setPrefix,
   referralName, onReferralNameChange, onReferralIdChange,
   referralPhone, onReferralPhoneChange
 }) => {
@@ -83,6 +85,30 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const [newFieldTitle, setNewFieldTitle] = useState("");
   const [docMenuOpen, setDocMenuOpen] = useState(false);
   const [docIndex, setDocIndex] = useState(-1);
+  const [draggedSectionIdx, setDraggedSectionIdx] = useState<number | null>(null);
+  const [dragOverSectionIdx, setDragOverSectionIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (patientAge) {
+      if (patientAge.includes("Yrs/")) {
+        const parts = patientAge.split("Yrs/");
+        if (parts.length === 2) {
+          setAge(parts[0].trim());
+          setGender(parts[1].trim());
+        }
+      } else {
+        setAge(patientAge.replace(/\D/g, ''));
+      }
+    }
+  }, [patientAge]);
+
+  useEffect(() => {
+    if (templateId !== undefined && templateId !== null) {
+      setSelectedTemplateId(templateId.toString());
+    } else {
+      setSelectedTemplateId("");
+    }
+  }, [templateId]);
 
   // ── Patient Autocomplete ──
   const [patients, setPatients] = useState<any[]>([]);
@@ -651,84 +677,136 @@ const ReportForm: React.FC<ReportFormProps> = ({
         <div style={card}>
           <h4 style={cardHdr}>{icon(<FiActivity color="#b45309" />, "#b4530918")} Clinical Findings</h4>
 
-          {sections.map((section, i) => {
-            if (section.isHeading) {
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", margin: "12px 0 8px" }}>
-                  <input type="text" value={section.title} onChange={e => updateHeadingTitle(i, e.target.value)}
-                    onFocus={focus(`h${i}`)} onBlur={blur}
-                    style={{
-                      ...inp(`h${i}`), flex: 1, fontWeight: "800",
-                      textTransform: "uppercase", color: THEME.danger,
-                      borderColor: THEME.highlightBorder, background: THEME.highlight,
-                    }} />
-                  <span style={{ fontSize: "10px", color: THEME.muted, whiteSpace: "nowrap", fontWeight: "600" }}>SECTION</span>
-                  <button onClick={() => deleteSection(i)} style={{
-                    padding: "4px 8px", border: `1px solid ${THEME.border}`,
-                    borderRadius: "5px", cursor: "pointer", color: THEME.danger, background: "white", fontSize: "12px",
-                  }}>✕</button>
-                </div>
-              );
-            }
-
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggedSectionIdx !== null && dragOverSectionIdx !== null && draggedSectionIdx !== dragOverSectionIdx) {
+                setSections(p => {
+                  const copy = [...p];
+                  const draggedItem = copy[draggedSectionIdx];
+                  copy.splice(draggedSectionIdx, 1);
+                  copy.splice(dragOverSectionIdx, 0, draggedItem);
+                  return copy;
+                });
+              }
+              setDraggedSectionIdx(null);
+              setDragOverSectionIdx(null);
+            }}
+            style={{ display: "flex", flexDirection: "column" }}
+          >
+            {sections.map((section, i) => {
             const isHL = !!section.highlight;
             const fk   = `s${i}`;
             const act  = activeField === fk;
 
             return (
-              <div key={i} style={{ marginBottom: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
-                  <label style={{ ...lbl, marginBottom: 0 }}>
-                    {section.title}
-                    {isHL && (
-                      <span style={{ color: THEME.danger, marginLeft: "8px", textTransform: "none", letterSpacing: 0, fontWeight: "500", display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
-                        <FiKey style={{ marginRight: 4 }} /> Key
-                      </span>
-                    )}
-                  </label>
-
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    {(["bold", "italic", "red"] as const).map(fmt => (
-                      <button key={fmt} className="rfmt" type="button"
-                        onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
-                        style={{
-                          padding: "2px 7px", border: `1px solid ${THEME.border}`,
-                          borderRadius: "5px", cursor: "pointer", fontSize: "12px",
-                          fontWeight: fmt === "bold" ? "700" : "400",
-                          fontStyle: fmt === "italic" ? "italic" : "normal",
-                          background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
-                          transition: "background 0.12s",
-                        }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
-                    ))}
-                    {!isHL && (
-                      <button className="rrem" onClick={() => deleteSection(i)} style={{
-                        padding: "2px 8px", border: `1px solid ${THEME.border}`,
-                        borderRadius: "5px", cursor: "pointer", fontSize: "11px",
-                        fontWeight: "600", color: THEME.danger, background: "white",
-                        transition: "background 0.12s", fontFamily: "inherit",
-                        display: "flex", alignItems: "center"
-                      }}><FiX style={{ marginRight: 4 }} /> Remove</button>
-                    )}
-                  </div>
+              <div
+                key={i}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedSectionIdx(i);
+                  e.dataTransfer.effectAllowed = "move";
+                  const dragGhost = document.createElement("div");
+                  e.dataTransfer.setDragImage(dragGhost, 0, 0);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  setDragOverSectionIdx(i);
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onDragEnd={() => {
+                  setDraggedSectionIdx(null);
+                  setDragOverSectionIdx(null);
+                }}
+                style={{
+                  marginBottom: "10px",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: section.isHeading ? "center" : "flex-start",
+                  borderTop: dragOverSectionIdx === i ? `2px solid ${THEME.teal}` : "none",
+                  opacity: draggedSectionIdx === i ? 0.4 : 1,
+                  transition: "border 0.2s, opacity 0.2s",
+                }}
+              >
+                <div style={{ cursor: "grab", color: THEME.muted, display: "flex", alignItems: "center", paddingTop: section.isHeading ? "0" : "10px" }}>
+                  <MdDragIndicator size={20} />
                 </div>
+                
+                <div style={{ flex: 1, pointerEvents: draggedSectionIdx !== null ? "none" : "auto" }}>
+                  {section.isHeading ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input type="text" value={section.title} onChange={e => updateHeadingTitle(i, e.target.value)}
+                        onFocus={focus(`h${i}`)} onBlur={blur}
+                        style={{
+                          ...inp(`h${i}`), flex: 1, fontWeight: "800",
+                          textTransform: "uppercase", color: THEME.danger,
+                          borderColor: THEME.highlightBorder, background: THEME.highlight,
+                        }} />
+                      <span style={{ fontSize: "10px", color: THEME.muted, whiteSpace: "nowrap", fontWeight: "600" }}>SECTION</span>
+                      <button onClick={() => deleteSection(i)} style={{
+                        padding: "4px 8px", border: `1px solid ${THEME.border}`,
+                        borderRadius: "5px", cursor: "pointer", color: THEME.danger, background: "white", fontSize: "12px",
+                      }}>✕</button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
+                        <label style={{ ...lbl, marginBottom: 0 }}>
+                          {section.title}
+                          {isHL && (
+                            <span style={{ color: THEME.danger, marginLeft: "8px", textTransform: "none", letterSpacing: 0, fontWeight: "500", display: "inline-flex", alignItems: "center", verticalAlign: "middle" }}>
+                              <FiKey style={{ marginRight: 4 }} /> Key
+                            </span>
+                          )}
+                        </label>
 
-                <textarea id={`ta${i}`} value={section.content}
-                  onChange={e => updateSection(i, e.target.value)}
-                  onFocus={focus(fk)} onBlur={blur}
-                  rows={isHL ? 4 : 3}
-                  onKeyDown={e => {
-                    if (e.ctrlKey && e.key === "b") { e.preventDefault(); applyFormat(i, e.currentTarget, "bold"); }
-                    if (e.ctrlKey && e.key === "i") { e.preventDefault(); applyFormat(i, e.currentTarget, "italic"); }
-                  }}
-                  style={{
-                    ...inp(fk), resize: "vertical", lineHeight: 1.55,
-                    borderColor: isHL ? (act ? THEME.danger : THEME.highlightBorder) : (act ? THEME.teal : THEME.border),
-                    background: isHL ? THEME.highlight : THEME.white,
-                    boxShadow: act ? (isHL ? "0 0 0 3px rgba(220,53,69,0.12)" : "0 0 0 3px rgba(13,148,136,0.15)") : "none",
-                  }} />
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          {(["bold", "italic", "red"] as const).map(fmt => (
+                            <button key={fmt} className="rfmt" type="button"
+                              onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
+                              style={{
+                                padding: "2px 7px", border: `1px solid ${THEME.border}`,
+                                borderRadius: "5px", cursor: "pointer", fontSize: "12px",
+                                fontWeight: fmt === "bold" ? "700" : "400",
+                                fontStyle: fmt === "italic" ? "italic" : "normal",
+                                background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                                transition: "background 0.12s",
+                              }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
+                          ))}
+                          {!isHL && (
+                            <button className="rrem" onClick={() => deleteSection(i)} style={{
+                              padding: "2px 8px", border: `1px solid ${THEME.border}`,
+                              borderRadius: "5px", cursor: "pointer", fontSize: "11px",
+                              fontWeight: "600", color: THEME.danger, background: "white",
+                              transition: "background 0.12s", fontFamily: "inherit",
+                              display: "flex", alignItems: "center"
+                            }}><FiX style={{ marginRight: 4 }} /> Remove</button>
+                          )}
+                        </div>
+                      </div>
+
+                      <textarea id={`ta${i}`} value={section.content}
+                        onChange={e => updateSection(i, e.target.value)}
+                        onFocus={focus(fk)} onBlur={blur}
+                        rows={isHL ? 4 : 3}
+                        onKeyDown={e => {
+                          if (e.ctrlKey && e.key === "b") { e.preventDefault(); applyFormat(i, e.currentTarget, "bold"); }
+                          if (e.ctrlKey && e.key === "i") { e.preventDefault(); applyFormat(i, e.currentTarget, "italic"); }
+                        }}
+                        style={{
+                          ...inp(fk), resize: "vertical", lineHeight: 1.55,
+                          borderColor: isHL ? (act ? THEME.danger : THEME.highlightBorder) : (act ? THEME.teal : THEME.border),
+                          background: isHL ? THEME.highlight : THEME.white,
+                          boxShadow: act ? (isHL ? "0 0 0 3px rgba(220,53,69,0.12)" : "0 0 0 3px rgba(13,148,136,0.15)") : "none",
+                        }} />
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
+          </div>
 
           {/* Add custom field */}
           <div style={{
