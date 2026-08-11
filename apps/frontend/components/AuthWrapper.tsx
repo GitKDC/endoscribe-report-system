@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 import LoginScreen from "./LoginScreen";
 import Sidebar from "./Sidebar";
@@ -7,6 +8,20 @@ import Header from "./Header";
 
 function MainApp({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Hack to restore Chromium keyboard focus which often gets lost 
+    // when Next.js unmounts the currently focused button during navigation in Electron.
+    // This prevents the dreaded "frozen inputs" bug.
+    if (typeof window !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    if (typeof window !== "undefined") {
+      window.focus();
+    }
+  }, [pathname, searchParams]);
 
   if (loading) return null;
 

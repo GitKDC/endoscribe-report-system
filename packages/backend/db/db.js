@@ -44,6 +44,7 @@ db.serialize(() => {
 
   db.run("PRAGMA foreign_keys = ON");
   db.run("PRAGMA journal_mode = WAL");
+  db.run("PRAGMA busy_timeout = 10000");
 });
 
 const migrationPath = path.join(__dirname, "migration.sql");

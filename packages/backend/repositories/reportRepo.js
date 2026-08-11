@@ -506,24 +506,40 @@ const saveReportPdf = (reportNumber, base64Data, filename) => {
       const baseReportsPath = getStoragePaths().reports;
       const relativePath = path.relative(baseReportsPath, filePath);
 
-      if (reportNumber) {
-        db.run(
-          "UPDATE reports SET pdf_path = ? WHERE report_number = ?",
-          [relativePath, reportNumber],
-          (err) => {
-            if (err) {
-              console.error("Failed to link PDF to report DB:", err);
-            }
-            resolve({ success: true, relativePath, absolutePath: filePath });
-          }
-        );
-      } else {
-        resolve({ success: true, relativePath, absolutePath: filePath });
-      }
-    } catch (err) {
-      reject(err);
+      db.run(
+        `UPDATE reports SET pdf_path = ? WHERE report_number = ?`,
+        [relativePath, reportNumber],
+        function (err) {
+          if (err) reject(err);
+          else resolve({ success: true, filePath: relativePath });
+        }
+      );
+    } catch (e) {
+      reject(e);
     }
   });
 };
 
-module.exports = { saveReport, updateReport, getAllReports, getReport, generateReportNumber, getSetting, setSetting, saveReportPdf };
+const saveReportWord = (reportNumber, htmlContent, filename) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const { getMonthlyReportsPath, getStoragePaths } = require("../utils/appPaths");
+
+      const reportsDir = getMonthlyReportsPath();
+      const filePath = path.join(reportsDir, filename);
+
+      fs.writeFileSync(filePath, htmlContent, "utf-8");
+
+      const baseReportsPath = getStoragePaths().reports;
+      const relativePath = path.relative(baseReportsPath, filePath);
+
+      resolve({ success: true, filePath: relativePath });
+    } catch (e) {
+      reject(e);
+    }
+  });
+};
+
+module.exports = { saveReport, updateReport, getAllReports, getReport, generateReportNumber, getSetting, setSetting, saveReportPdf, saveReportWord };

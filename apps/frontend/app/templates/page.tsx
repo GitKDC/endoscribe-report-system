@@ -16,7 +16,7 @@ const THEME = {
   dangerBg:"#fef2f2",
 };
 
-type Section = { title: string; content: string; highlight?: boolean; isHeading?: boolean };
+type Section = { title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean };
 type Template = { id: number; name: string; category: string; sections: Section[] };
 type Category = { id: number; name: string; color_bg: string; color_fg: string; default_sections: Section[] };
 
@@ -112,6 +112,14 @@ export default function TemplatePage() {
   const toggleHighlight      = (i: number, isCat = false) => {
     const setter = isCat ? setCSections : setFSections;
     setter(p => p.map((s, idx) => idx === i ? { ...s, highlight: !s.highlight } : s));
+  };
+  const toggleHeading        = (i: number, isCat = false) => {
+    const setter = isCat ? setCSections : setFSections;
+    setter(p => p.map((s, idx) => idx === i ? { ...s, isHeading: !s.isHeading, isLine: false } : s));
+  };
+  const toggleLine           = (i: number, isCat = false) => {
+    const setter = isCat ? setCSections : setFSections;
+    setter(p => p.map((s, idx) => idx === i ? { ...s, isLine: !s.isLine, isHeading: false } : s));
   };
   const removeSection        = (i: number, isCat = false) => {
     const setter = isCat ? setCSections : setFSections;
@@ -506,19 +514,47 @@ export default function TemplatePage() {
                         >
                           {s.highlight ? "★ Key" : "☆ Key"}
                         </button>
+                        <button
+                          onClick={() => toggleHeading(i, false)}
+                          title="Toggle heading / box"
+                          style={{
+                            padding: "5px 10px", border: `1.5px solid ${s.isHeading ? "#f53a3a" : THEME.border}`,
+                            borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", background: s.isHeading ? "#fee2e2" : "white",
+                            color: s.isHeading ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.isHeading ? "H Box" : "H Normal"}
+                        </button>
+                        <button
+                          onClick={() => toggleLine(i, false)}
+                          title="Toggle red text line"
+                          style={{
+                            padding: "5px 10px", border: `1.5px solid ${s.isLine ? "#f53a3a" : THEME.border}`,
+                            borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", background: s.isLine ? "#fee2e2" : "white",
+                            color: s.isLine ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.isLine ? "T Red" : "T Normal"}
+                        </button>
                         <button onClick={() => removeSection(i, false)} style={{
                           padding: "5px 9px", border: `1px solid #fecaca`,
                           borderRadius: "6px", cursor: "pointer", background: THEME.dangerBg,
                           color: THEME.danger, fontSize: "13px",
                         }}>✕</button>
                       </div>
-                      <textarea
-                        value={s.content}
-                        onChange={e => updateSectionContent(i, e.target.value, false)}
-                        placeholder="Default content (leave empty if doctor fills it each time)"
-                        rows={2}
-                        style={{ ...inp, resize: "vertical", lineHeight: 1.5 }}
-                      />
+                      {(!s.isHeading && !s.isLine) && (
+                        <textarea
+                          value={s.content}
+                          onChange={e => updateSectionContent(i, e.target.value, false)}
+                          placeholder="Default content (leave empty if doctor fills it each time)"
+                          rows={2}
+                          style={{ ...inp, resize: "vertical", lineHeight: 1.5 }}
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -639,11 +675,39 @@ export default function TemplatePage() {
                             }}>
                             {s.highlight ? "★ Key" : "☆ Key"}
                           </button>
+                          <button
+                            onClick={() => toggleHeading(i, true)}
+                            title="Toggle heading / box"
+                            style={{
+                              padding: "5px 10px", border: `1.5px solid ${s.isHeading ? "#f53a3a" : THEME.border}`,
+                              borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                              fontWeight: "600", background: s.isHeading ? "#fee2e2" : "white",
+                              color: s.isHeading ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {s.isHeading ? "H Box" : "H Normal"}
+                          </button>
+                          <button
+                            onClick={() => toggleLine(i, true)}
+                            title="Toggle red text line"
+                            style={{
+                              padding: "5px 10px", border: `1.5px solid ${s.isLine ? "#f53a3a" : THEME.border}`,
+                              borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                              fontWeight: "600", background: s.isLine ? "#fee2e2" : "white",
+                              color: s.isLine ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {s.isLine ? "T Red" : "T Normal"}
+                          </button>
                           <button onClick={() => removeSection(i, true)} style={{
                             padding: "5px 9px", border: `1px solid #fecaca`, borderRadius: "6px", cursor: "pointer", background: THEME.dangerBg, color: THEME.danger, fontSize: "13px",
                           }}>✕</button>
                         </div>
-                        <textarea value={s.content} onChange={e => updateSectionContent(i, e.target.value, true)} placeholder="Default content" rows={1} style={{ ...inp, resize: "vertical" }} />
+                        {(!s.isHeading && !s.isLine) && (
+                          <textarea value={s.content} onChange={e => updateSectionContent(i, e.target.value, true)} placeholder="Default content" rows={1} style={{ ...inp, resize: "vertical" }} />
+                        )}
                       </div>
                     ))}
                   </div>

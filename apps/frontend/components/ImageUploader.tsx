@@ -118,7 +118,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               style={{ display: "none" }}
             />
             <p style={{ margin: "0 0 5px 0", fontWeight: "bold", color: "#007bff" }}>
-              Click to upload up to 6 image(s)
+              Click to upload up to {maxImages} image(s)
             </p>
             <p style={{ margin: 0, color: "#666", fontSize: 12 }}>
               or drag and drop PNG, JPG, JPEG images

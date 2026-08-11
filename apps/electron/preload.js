@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld("api", {
   saveReport:    async (data)  => ipcRenderer.invoke("save-report", data),
   updateReport:  async (data)  => ipcRenderer.invoke("update-report", data),
   saveReportPdf: async (data)  => ipcRenderer.invoke("save-report-pdf", data),
+  saveReportWord: async (data) => ipcRenderer.invoke("save-report-word", data),
 
   // ─── DASHBOARD APIs ────────────────────────────────────────────────────────
   getDashboardStats: async () => ipcRenderer.invoke("get-dashboard-stats"),

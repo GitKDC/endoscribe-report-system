@@ -1,15 +1,9 @@
 import AuthWrapper from "../components/AuthWrapper";
 import LicenseGate from "../components/LicenseGate";
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ 
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'] 
-});
 
 export default function RootLayout({ children }: any) {
   return (
-    <html>
+    <html lang="en">
       <head>
         <style>{`
           input, button, textarea, select {
@@ -29,7 +23,7 @@ export default function RootLayout({ children }: any) {
           }
         `}</style>
       </head>
-      <body className={inter.className} style={{ margin: 0, display: "flex", height: "100vh", overflow: "hidden" }}>
+      <body style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', margin: 0, display: "flex", height: "100vh", overflow: "hidden" }}>
         <LicenseGate>
           <AuthWrapper>{children}</AuthWrapper>
         </LicenseGate>

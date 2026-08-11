@@ -24,6 +24,7 @@ interface Section {
   content: string;
   highlight?: boolean;
   isHeading?: boolean;
+  isLine?: boolean;
 }
 
 interface Doctor {
@@ -224,9 +225,9 @@ const ReportForm: React.FC<ReportFormProps> = ({
   const lbl: React.CSSProperties = {
     display: "block",
     fontSize: "11px",
-    fontWeight: "600",
+    fontWeight: "700",
     marginBottom: "5px",
-    color: THEME.muted,
+    color: THEME.navy,
     textTransform: "uppercase",
     letterSpacing: "0.4px",
     fontFamily: "'Inter', sans-serif",
@@ -277,6 +278,19 @@ const ReportForm: React.FC<ReportFormProps> = ({
       for (let i = prev.length - 1; i >= 0; i--) { if (prev[i].highlight) { insertAt = i; break; } }
       const copy = [...prev];
       copy.splice(insertAt, 0, { title, content: "" });
+      return copy;
+    });
+    setNewFieldTitle("");
+  };
+
+  const addCustomHeading = () => {
+    const title = newFieldTitle.trim();
+    if (!title) return;
+    setSections(prev => {
+      let insertAt = prev.length;
+      for (let i = prev.length - 1; i >= 0; i--) { if (prev[i].highlight) { insertAt = i; break; } }
+      const copy = [...prev];
+      copy.splice(insertAt, 0, { title, content: "", isHeading: true });
       return copy;
     });
     setNewFieldTitle("");
@@ -749,6 +763,47 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         borderRadius: "5px", cursor: "pointer", color: THEME.danger, background: "white", fontSize: "12px",
                       }}>✕</button>
                     </div>
+                  ) : section.isLine ? (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
+                        <label style={{ ...lbl, marginBottom: 0, color: THEME.teal }}>
+                          Standalone Line
+                        </label>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          {(["bold", "italic", "red"] as const).map(fmt => (
+                            <button key={fmt} className="rfmt" type="button"
+                              onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
+                              style={{
+                                padding: "2px 7px", border: `1px solid ${THEME.border}`,
+                                borderRadius: "5px", cursor: "pointer", fontSize: "12px",
+                                fontWeight: fmt === "bold" ? "700" : "400",
+                                fontStyle: fmt === "italic" ? "italic" : "normal",
+                                background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
+                                transition: "background 0.12s",
+                              }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
+                          ))}
+                          <button className="rrem" onClick={() => deleteSection(i)} style={{
+                            padding: "2px 8px", border: `1px solid ${THEME.border}`,
+                            borderRadius: "5px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", color: THEME.danger, background: "white",
+                            transition: "background 0.12s", fontFamily: "inherit",
+                            display: "flex", alignItems: "center"
+                          }}><FiX style={{ marginRight: 4 }} /> Remove</button>
+                        </div>
+                      </div>
+                      <textarea id={`ta${i}`} value={section.content || section.title || ""}
+                        onChange={e => updateSection(i, e.target.value)}
+                        onFocus={focus(fk)} onBlur={blur}
+                        rows={2}
+                        onKeyDown={e => {
+                          if (e.ctrlKey && e.key === "b") { e.preventDefault(); applyFormat(i, e.currentTarget, "bold"); }
+                          if (e.ctrlKey && e.key === "i") { e.preventDefault(); applyFormat(i, e.currentTarget, "italic"); }
+                        }}
+                        style={{
+                          ...inp(fk), resize: "vertical", lineHeight: 1.55,
+                          borderColor: act ? THEME.teal : THEME.border,
+                        }} />
+                    </div>
                   ) : (
                     <div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "5px" }}>
@@ -817,21 +872,51 @@ const ReportForm: React.FC<ReportFormProps> = ({
             <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: "600", color: THEME.teal, textTransform: "uppercase", letterSpacing: "0.5px", display: "flex", alignItems: "center" }}>
               <FiPlus style={{ marginRight: 6 }} /> Add Custom Field
             </p>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               <input type="text" value={newFieldTitle}
                 onChange={e => setNewFieldTitle(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") addCustomSection(); }}
                 placeholder="Field name, e.g. Colon, Biopsy Site…"
                 onFocus={focus("nf")} onBlur={blur}
-                style={{ ...inp("nf"), flex: 1 }} />
+                style={{ ...inp("nf"), flex: "1 1 200px" }} />
               <button onClick={addCustomSection} disabled={!newFieldTitle.trim()} style={{
-                padding: "9px 16px",
+                padding: "8px 12px",
                 background: newFieldTitle.trim() ? THEME.teal : THEME.border,
                 color: "white", border: "none", borderRadius: "7px",
-                fontSize: "13px", fontWeight: "600",
+                fontSize: "12px", fontWeight: "600",
                 cursor: newFieldTitle.trim() ? "pointer" : "not-allowed",
                 whiteSpace: "nowrap", fontFamily: "inherit",
-              }}>Add Field</button>
+                flex: "1 1 auto"
+              }}>+ Field</button>
+              <button onClick={() => {
+                const title = newFieldTitle.trim();
+                if (!title) return;
+                setSections(prev => {
+                  let insertAt = prev.length;
+                  for (let i = prev.length - 1; i >= 0; i--) { if (prev[i].highlight) { insertAt = i; break; } }
+                  const copy = [...prev];
+                  copy.splice(insertAt, 0, { title: "", content: title, isLine: true });
+                  return copy;
+                });
+                setNewFieldTitle("");
+              }} disabled={!newFieldTitle.trim()} style={{
+                padding: "8px 12px",
+                background: newFieldTitle.trim() ? THEME.navy : THEME.border,
+                color: "white", border: "none", borderRadius: "7px",
+                fontSize: "12px", fontWeight: "600",
+                cursor: newFieldTitle.trim() ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap", fontFamily: "inherit",
+                flex: "1 1 auto"
+              }}>+ Line</button>
+              <button onClick={addCustomHeading} disabled={!newFieldTitle.trim()} style={{
+                padding: "8px 12px",
+                background: newFieldTitle.trim() ? "#f53a3a" : THEME.border,
+                color: "white", border: "none", borderRadius: "7px",
+                fontSize: "12px", fontWeight: "600",
+                cursor: newFieldTitle.trim() ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap", fontFamily: "inherit",
+                flex: "1 1 auto"
+              }}>+ Heading</button>
             </div>
           </div>
         </div>

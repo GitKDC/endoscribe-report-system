@@ -118,13 +118,21 @@ const registerReportHandlers = () => {
   });
 
   // ── Save PDF directly to reports directory ─────────────────────────────────
-  ipcMain.handle("save-report-pdf", async (_, data) => {
+  ipcMain.handle("save-report-pdf", async (event, data) => {
     try {
       const { saveReportPdf } = require("../repositories/reportRepo");
       return await saveReportPdf(data.reportNumber, data.base64Data, data.filename);
-    } catch (error) {
-      console.error("❌ Error saving report pdf:", error);
-      throw error;
+    } catch (err) {
+      throw err;
+    }
+  });
+
+  ipcMain.handle("save-report-word", async (event, data) => {
+    try {
+      const { saveReportWord } = require("../repositories/reportRepo");
+      return await saveReportWord(data.reportNumber, data.htmlContent, data.filename);
+    } catch (err) {
+      throw err;
     }
   });
 

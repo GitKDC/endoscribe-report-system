@@ -282,4 +282,422 @@ export const exportAsImage = async (reportDate: string, patientName: string, age
   } catch (err) {
     console.error("Export failed:", err);
   }
+};// ── Types mirrored here so reportGenerator.ts stays self-contained ─────────────
+interface WordSection  { title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean; }
+interface WordImageData { id: string; url: string; label: string; nbiLabel?: string; brightness?: number; contrast?: number; }
+interface WordDoctor   { id: number; name: string; qualifications?: string; designation?: string; }
+
+const REPORT_TITLE_MAP_WORD: Record<string, string> = {
+  UGI: "UPPER GI ENDOSCOPY REPORT",
+  VLS: "VLS SCOPY REPORT",
+  SIGMOIDOSCOPY: "SIGMOIDOSCOPY REPORT",
+  COLONOSCOPY: "COLONOSCOPY REPORT",
 };
+
+/** Convert a single image element (by its src) to a cropped, brightness/contrast-adjusted base64 JPEG */
+const imageToBase64ForWord = async (
+  src: string,
+  cropW: number,
+  cropH: number,
+  brightness: number,
+  contrast: number,
+  nbiLabel?: string
+): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const cw = cropW; // NO SCALE! Word renders base64 images at native pixel size!
+        const ch = cropH;
+        const canvas = document.createElement("canvas");
+        canvas.width = cw;
+        canvas.height = ch;
+        const ctx = canvas.getContext("2d")!;
+
+        // object-fit: cover  – mimic what the preview does
+        const imgRatio = img.width / img.height;
+        const tgtRatio = cw / ch;
+        let drawW, drawH, ox, oy;
+        if (imgRatio > tgtRatio) {
+          drawH = ch; drawW = img.width * (ch / img.height);
+          ox = (cw - drawW) / 2; oy = 0;
+        } else {
+          drawW = cw; drawH = img.height * (cw / img.width);
+          ox = 0; oy = (ch - drawH) / 2;
+        }
+
+        ctx.filter = `brightness(${brightness / 100}) contrast(${contrast / 100})`;
+        ctx.drawImage(img, ox, oy, drawW, drawH);
+
+        // Draw NBI label directly onto the image canvas
+        if (nbiLabel) {
+          ctx.filter = "none";
+          ctx.fillStyle = "#FCD34D"; // yellow-400
+          ctx.font = "bold 14px 'Segoe UI', Tahoma, sans-serif";
+          const paddingX = 6;
+          const paddingY = 4;
+          const textMetrics = ctx.measureText(nbiLabel);
+          const boxWidth = textMetrics.width + paddingX * 2;
+          const boxHeight = 22;
+          ctx.fillRect(0, 0, boxWidth, boxHeight);
+          ctx.fillStyle = "#000000";
+          ctx.textBaseline = "middle";
+          ctx.fillText(nbiLabel, paddingX, boxHeight / 2 + 1);
+        }
+
+        resolve(canvas.toDataURL("image/jpeg", 0.93));
+      } catch {
+        resolve(src); // fallback – keep original
+      }
+    };
+    img.onerror = () => resolve(src);
+
+    // Convert blob / relative paths to something img.src can load
+    if (src.startsWith("blob:") || src.startsWith("data:") || src.startsWith("http")) {
+      img.src = src;
+    } else if (src.startsWith("/")) {
+      img.src = src; // Next.js serves these
+    } else {
+      img.src = src;
+    }
+  });
+};
+
+/** Fetch a local public image and resize it exactly to target dimensions for Word */
+const resizeLocalImageToBase64 = async (path: string, tgtW: number, forceH?: number): Promise<string> => {
+  try {
+    const resp = await fetch(path);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    return new Promise<string>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const drawH = forceH || Math.round(img.height * (tgtW / img.width));
+        const canvas = document.createElement("canvas");
+        canvas.width = tgtW;
+        canvas.height = drawH;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, tgtW, drawH);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.95));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve("");
+      };
+      img.src = url;
+    });
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * Build a fully editable Word document from raw report data.
+ * Uses only HTML attributes + inline styles that Microsoft Word actually supports.
+ * Layout is driven by <table> elements instead of flexbox/grid.
+ */
+export const exportAsWord = async (
+  reportDate: string,
+  patientName: string,
+  ageGender: string,
+  reportType: string,
+  sections: WordSection[],
+  images: WordImageData[],
+  doctors: WordDoctor[],
+  prefix: string,
+  reportNumber?: string
+) => {
+  try {
+    const boundary = "----=_NextPart_000_ENDO_01D90000.00000000";
+    const mhtParts: string[] = [];
+    let partIndex = 0;
+
+    // Helper: register a base64 image as an MHT part and return the Content-Location key
+    const registerImage = (dataUrl: string, ext = "jpeg"): string => {
+      if (!dataUrl || !dataUrl.startsWith("data:")) return "";
+      const match = dataUrl.match(/^data:(image\/\w+);base64,([\s\S]+)$/);
+      if (!match) return "";
+      const [, mime, b64] = match;
+      const loc = `img_${partIndex++}.${ext}`;
+      const chunked = b64.match(/.{1,76}/g)?.join("\r\n") ?? b64;
+      mhtParts.push(
+        `--${boundary}\r\n` +
+        `Content-Type: ${mime}\r\n` +
+        `Content-Transfer-Encoding: base64\r\n` +
+        `Content-Location: ${loc}\r\n\r\n` +
+        `${chunked}\r\n`
+      );
+      return loc;
+    };
+
+    // ── 1. Header image ────────────────────────────────────────────────────────
+    // Calculate height dynamically based on exact aspect ratio
+    const headerB64 = await resizeLocalImageToBase64("/images/header.png", 730);
+    const headerLoc = registerImage(headerB64, "jpeg");
+
+    // ── 2. WEO logo ───────────────────────────────────────────────────────────
+    // Calculate height dynamically to prevent compression
+    const weoB64 = await resizeLocalImageToBase64("/images/weo.png", 150);
+    const weoLoc = registerImage(weoB64, "jpeg");
+
+    // ── 3. Medical images ──────────────────────────────────────────────────────
+    // right column: images 0-3
+    // bottom row  : images 4-5 (reversed to match web preview layout)
+    const rightImages  = images.slice(0, 4);
+    const bottomImages = images.slice(4, 6).reverse();
+
+    // ── Layout constants ─────────────────────────────────────────────────────
+    // Total width = 730px (Slightly narrower to ensure height fits on one page)
+    // Left column = 475px, Spacer = 10px, Right column = 245px
+    const RIGHT_W = 245, RIGHT_H = 184;
+    const BOT_W   = 232, BOT_H   = 174;
+
+    const rightLocs: string[] = [];
+    for (const img of rightImages) {
+      const b64 = await imageToBase64ForWord(img.url, RIGHT_W, RIGHT_H, img.brightness ?? 100, img.contrast ?? 100, img.nbiLabel);
+      rightLocs.push(registerImage(b64));
+    }
+
+    const bottomLocs: string[] = [];
+    for (const img of bottomImages) {
+      const b64 = await imageToBase64ForWord(img.url, BOT_W, BOT_H, img.brightness ?? 100, img.contrast ?? 100, img.nbiLabel);
+      bottomLocs.push(registerImage(b64));
+    }
+
+    // ── 4. Format helpers ──────────────────────────────────────────────────────
+    const fmtDate = (d: string) => {
+      if (!d) return "";
+      const dt = new Date(d);
+      return [String(dt.getDate()).padStart(2,"0"), String(dt.getMonth()+1).padStart(2,"0"), dt.getFullYear()].join("/");
+    };
+
+    const title = REPORT_TITLE_MAP_WORD[reportType] || `${reportType} REPORT`;
+
+    // Render one section row
+    const renderSection = (s: WordSection): string => {
+      if (s.isLine) return `<tr><td style="border-bottom:1pt solid #bbb;padding:1pt 0;font-size:1pt;">&nbsp;</td></tr>`;
+      if (s.isHeading) return `<tr><td style="padding:2pt 0 0;font-weight:700;font-size:11.5pt;border-bottom:1.5pt solid #222;">${s.title}</td></tr>`;
+      const safeContent = (s.content || "")
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/\*\*(.*?)\*\*/g,"<b>$1</b>")
+        .replace(/\*(.*?)\*/g,"<i>$1</i>")
+        .replace(/!!(.*?)!!/g,"<span style='color:#cc0000;'>$1</span>")
+        .replace(/\n/g,"<br>");
+
+      if (s.highlight) {
+        return `<tr><td style="padding:1pt 0;">
+          <table border="0" cellpadding="2" cellspacing="0" style="border:1.5pt solid #222;border-collapse:collapse;margin-bottom:1pt;">
+            <tr><td style="font-weight:700;font-size:10.5pt;">${s.title}</td></tr>
+          </table>
+          <p style="margin:0 0 1pt;font-size:10pt;">${safeContent}</p>
+        </td></tr>`;
+      }
+
+      return `<tr><td style="padding:0;"><p style="margin:0 0 1pt;font-size:10pt;"><b>${s.title}:-</b>&nbsp;${safeContent}</p></td></tr>`;
+    };
+
+    // Right column: stacked images
+    const rightImgHtml = rightImages.map((img, i) => {
+      const loc = rightLocs[i]; if (!loc) return "";
+      return `<tr><td align="right" style="padding-bottom:2pt;padding-left:0;padding-right:0;vertical-align:top;"><img src="${loc}" width="${RIGHT_W}" height="${RIGHT_H}" style="display:block;width:${RIGHT_W}px;height:${RIGHT_H}px;" alt="${img.label}"/></td></tr>`;
+    }).join("\n");
+
+    // Bottom row: 2 images side by side
+    const bottomImgHtml = bottomImages.length > 0 ? `<tr><td style="padding-top:6pt;padding-left:0;padding-right:0;">
+          <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+            <tr valign="top">
+              ${bottomImages.map((img, i) => {
+                const loc = bottomLocs[i]; if (!loc) return "";
+                return `<td style="padding-right:${i===0?"10px":"0"};padding-left:0;">
+                  <img src="${loc}" width="${BOT_W}" height="${BOT_H}" style="display:block;" alt="${img.label}"/>
+                </td>`;
+              }).join("")}
+            </tr>
+          </table>
+        </td></tr>` : "";
+
+    // Doctors footer cells
+    const doctorCells = doctors.map(doc => {
+      // Break designation explicitly as requested by user
+      const designation = (doc.designation || "").replace(" &", "<br/>&");
+      return `
+        <td style="padding:0;padding-right:10pt;">
+          <div style="font-weight:700;font-size:9pt;margin-bottom:1pt;">${doc.name}</div>
+          <div style="font-size:8pt;color:#333;margin-bottom:0;">${doc.qualifications}</div>
+          <div style="font-size:8pt;color:#333;margin-bottom:0;">${designation}</div>
+        </td>
+      `;
+    }).join("");
+
+    // ── 5. Build HTML ──────────────────────────────────────────────────────────
+    const htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
+ xmlns:w='urn:schemas-microsoft-com:office:word'
+ xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>${patientName} – ${title}</title>
+<style>
+<!--
+  /* ── Word-specific page section ── */
+  @page WordSection1 {
+    size: 595.3pt 841.9pt;
+    margin: 14.2pt 14.2pt 14.2pt 14.2pt; /* 0.5cm margins so 750px fits perfectly */
+    mso-header-margin: 14.2pt;
+    mso-footer-margin: 14.2pt;
+    mso-paper-source: 0;
+  }
+  div.WordSection1 { page:WordSection1; }
+  body { margin:0; padding:0; font-family:'Segoe UI',Tahoma,sans-serif; color:#111; }
+  p    { margin:0; padding:0; }
+  td   { font-family:'Segoe UI',Tahoma,sans-serif; }
+-->
+</style>
+<!--[if gte mso 9]><xml>
+<w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+</w:WordDocument>
+</xml><![endif]-->
+</head>
+<body>
+<div class="WordSection1">
+<table border="0" cellpadding="0" cellspacing="0" width="730"
+       style="width:730px;border-collapse:collapse;table-layout:fixed;margin:0;">
+  
+  <!-- Strict column sizing for Word -->
+  <tr style="height:0;">
+    <td width="475" style="width:475px;padding:0;border:none;"></td>
+    <td width="10" style="width:10px;padding:0;border:none;"></td>
+    <td width="245" style="width:245px;padding:0;border:none;"></td>
+  </tr>
+
+  <!-- ══ HEADER ═══════════════════════════════════════════════════ -->
+  <tr>
+    <td colspan="3" width="730" style="padding:0;font-size:0;line-height:0;padding-bottom:2pt;">
+      ${headerLoc ? `<img src="${headerLoc}" style="display:block;" alt="Header"/>` : ""}
+    </td>
+  </tr>
+
+  <!-- ══ PATIENT / DATE ROW ════════════════════════════════════════ -->
+  <tr>
+    <td width="475" style="padding:2pt 0;font-weight:700;font-size:11pt;vertical-align:middle;">
+      ${prefix}&nbsp;${patientName}&nbsp;&ndash;&nbsp;${ageGender}
+    </td>
+    <td width="10" style="padding:0;"></td>
+    <td width="245" align="right"
+        style="padding:2pt 0;font-size:10pt;font-weight:700;white-space:nowrap;vertical-align:middle;">
+      <span style="border:1pt solid #aaa;padding:2pt 6pt;">${fmtDate(reportDate)}${reportNumber ? `&nbsp;&nbsp;Ref:&nbsp;${reportNumber}` : ""}</span>
+    </td>
+  </tr>
+
+  <!-- ══ DIVIDER ════════════════════════════════════════════════════ -->
+  <tr>
+    <td colspan="3" width="730" style="border-top:1pt solid #bbb;padding:0;line-height:1px;font-size:1px;">&nbsp;</td>
+  </tr>
+
+  <!-- ══ BODY: LEFT (text + bottom images) + RIGHT (4 stacked images) ═ -->
+  <tr valign="top">
+    
+    <!-- LEFT COLUMN -->
+    <td width="475" style="padding:2pt 0 0 0;vertical-align:top;">
+      <table border="0" cellpadding="0" cellspacing="0" width="475"
+             style="table-layout:fixed;">
+        <!-- Report title box -->
+        <tr>
+          <td style="padding-bottom:2pt;padding-left:0;padding-right:0;">
+            <table border="0" cellpadding="2" cellspacing="0"
+                   style="border:2pt solid #222;border-collapse:collapse;">
+              <tr>
+                <td style="font-size:12pt;font-weight:700;letter-spacing:0.4pt;">
+                  ${title}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!-- Sections -->
+        ${sections
+          .filter(s => s.isHeading || s.isLine || (s.content && s.content.trim()))
+          .map(renderSection)
+          .join("\n")}
+        <!-- Bottom images (5th + 6th) -->
+        ${bottomImgHtml}
+      </table>
+    </td>
+
+    <!-- MIDDLE SPACER -->
+    <td width="10" style="padding:0;"></td>
+
+    <!-- RIGHT COLUMN -->
+    <td width="245" align="right" style="padding:2pt 0 0 0;vertical-align:top;">
+      <table border="0" cellpadding="0" cellspacing="0" width="245"
+             style="table-layout:fixed;">
+        ${rightImgHtml}
+      </table>
+    </td>
+  </tr>
+
+  <!-- ══ FOOTER ════════════════════════════════════════════════════ -->
+  <tr>
+    <td colspan="3" width="730"
+        style="border-top:1pt solid #ccc;padding:0;">
+      <table border="0" cellpadding="0" cellspacing="0" width="730" style="table-layout:fixed;">
+        <tr valign="bottom">
+          <td width="475" style="padding:2pt 0 0 0;">
+            <table border="0" cellpadding="0" cellspacing="0">
+              <tr valign="top">${doctorCells}</tr>
+            </table>
+          </td>
+          <td width="10" style="padding:0;"></td>
+          <td width="245" align="right"
+              style="padding:2pt 0 0 0;vertical-align:bottom;">
+            ${weoLoc
+              ? `<img src="${weoLoc}" style="display:inline;" alt="WEO"/>`
+              : ""}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</div>
+</body>
+</html>`;
+
+    // ── 6. Pack as MHT ────────────────────────────────────────────────────────
+    let mhtContent = `MIME-Version: 1.0\r\n`;
+    mhtContent += `Content-Type: multipart/related; boundary="${boundary}"; type="text/html"\r\n\r\n`;
+
+    mhtContent += `--${boundary}\r\n`;
+    mhtContent += `Content-Type: text/html; charset="utf-8"\r\n`;
+    mhtContent += `Content-Transfer-Encoding: 8bit\r\n`;
+    mhtContent += `Content-Location: document.html\r\n\r\n`;
+    mhtContent += `${htmlContent}\r\n`;
+
+    for (const part of mhtParts) {
+      mhtContent += `\r\n${part}`;
+    }
+    mhtContent += `\r\n--${boundary}--\r\n`;
+
+    const filename = `${formatFileName(patientName, reportType, reportDate, ageGender, reportNumber)}.doc`;
+
+    if (typeof window !== "undefined" && (window as any).api && (window as any).api.saveReportWord) {
+      return await (window as any).api.saveReportWord({ reportNumber, htmlContent: mhtContent, filename });
+    } else {
+      const blob = new Blob([mhtContent], { type: "application/msword" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  } catch (err) {
+    console.error("Word export failed:", err);
+    throw err;
+  }
+};
+

@@ -14,6 +14,7 @@ interface Section {
   content: string;
   highlight?: boolean;
   isHeading?: boolean;
+  isLine?: boolean;
 }
 
 interface Doctor {
@@ -85,9 +86,9 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
     ].join("/");
   };
 
-  // Only sections with actual content (or marked headings) are rendered
+  // Only sections with actual content (or marked headings/lines) are rendered
   const visibleSections = sections.filter(
-    (s) => s.isHeading || (s.content && s.content.trim() !== "")
+    (s) => s.isHeading || s.isLine || (s.content && s.content.trim() !== "")
   );
 
   // Calculate approximate lines by counting explicit newlines + estimating wrapped lines
@@ -175,7 +176,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
       }}
     >
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
-      <div style={{ flexShrink: 0 }}>
+      <div id="report-header-container" style={{ flexShrink: 0 }}>
         <img
           src="/images/header.png"
           alt="Hospital Header"
@@ -205,6 +206,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
 
       {/* ── BODY — fills all space between header and footer ────────────── */}
       <div
+        id="report-body-container"
         style={{
           flex: 1,
           minHeight: 0,
@@ -245,9 +247,10 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         {/* Content split (Left / Right) */}
-        <div style={{ display: "flex", gap: "12px", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <div id="report-content-split" style={{ display: "flex", gap: "12px", flex: 1, minHeight: 0, overflow: "hidden" }}>
           {/* ── LEFT: title + text + bottom images ────────── */}
           <div
+            id="report-left-col"
             style={{
               flex: "1 1 66%",
               display: "flex",
@@ -272,7 +275,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                 letterSpacing: "0.5px",
               }}
             >
-              {displayTitle}
+              {displayTitle} REPORT
             </h2>
           </div>
 
@@ -285,29 +288,36 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                   style={{
                     display: "block",
                     width: "fit-content",
-                    border: "1.5px solid #f53a3a",
-                    color: "#f53a3a",
+                    border: "1.5px solid #000",
+                    color: "#000",
                     fontWeight: "900",
                     textTransform: "uppercase",
                     fontSize: bodyFont,
                     letterSpacing: "0.5px",
-                    padding: "3px 28px 3px 10px",
+                    padding: "3px 10px",
                     margin: "4px 0 8px 0",
                     position: "relative",
                   }}
                 >
                   {section.title}
+                </div>
+              ) : section.isLine ? (
+                <div
+                  key={index}
+                  style={{
+                    marginBottom: paraGap,
+                    pageBreakInside: "avoid",
+                  }}
+                >
                   <span
-                    style={{
-                      position: "absolute",
-                      right: "6px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      fontSize: "11px",
+                    style={{ whiteSpace: "pre-wrap", color: "#111" }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: (section.content || section.title || "")
+                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+                        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+                        .replace(/!!(.*?)!!/g, '<span style="color: #f53a3a;">$1</span>')
                     }}
-                  >
-                    ▶
-                  </span>
+                  />
                 </div>
               ) : (
                 <p
@@ -350,6 +360,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
           {/* Images 5-6 */}
           {bottomImages.length > 0 && (
             <div
+              id="report-bottom-images"
               style={{
                 flexShrink: 0,
                 display: "flex",
@@ -375,6 +386,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                     alt={img.label}
                     data-brightness={img.brightness ?? 100}
                     data-contrast={img.contrast ?? 100}
+                    data-crop="true"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -393,6 +405,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         {/* ── RIGHT: images 1-4 ─────────────────────────────────────── */}
         {rightImages.length > 0 && (
           <div
+            id="report-right-col"
             style={{
               flex: "0 0 32%",
               display: "flex",
@@ -418,6 +431,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                     alt={img.label}
                     data-brightness={img.brightness ?? 100}
                     data-contrast={img.contrast ?? 100}
+                    data-crop="true"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -436,12 +450,6 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
       </div>
 
       {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-      {/*
-        Doctor columns are now generated from footerDoctors (driven by the
-        multi-select in ReportForm). The exact same markup/styles as before
-        are reused per-doctor, so visual output is unchanged whether there
-        are 1, 2, or more doctors selected.
-      */}
       <div
         style={{
           flexShrink: 0,
@@ -454,6 +462,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
       >
         {/* LEFT: Doctors */}
         <div
+          id="footer-left-doctors"
           style={{
             display: "flex",
             gap: "20px",
@@ -476,7 +485,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
         </div>
 
         {/* RIGHT: WEO */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", paddingRight: "16px", marginLeft: "auto", flexShrink: 0 }}>
+        <div id="footer-right-weo" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", paddingRight: "16px", marginLeft: "auto", flexShrink: 0 }}>
           <img
             src="/images/weo.png"
             alt="WEO"

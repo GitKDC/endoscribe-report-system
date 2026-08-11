@@ -341,26 +341,43 @@ export default function ReportsPage() {
                   </TableCell>
                   <TableCell>
                     <div style={{ display: "flex", gap: "8px", marginLeft: "-8px" }}>
-                      <Button variant="icon" size="sm" icon={<IoMdEye size={18} />} onClick={() => handleView(r.id)} />
+                      <Button 
+                        variant="icon" 
+                        size="sm" 
+                        icon={<IoMdEye size={18} />} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleView(r.id);
+                        }} 
+                      />
                       <Button 
                         variant="icon" 
                         size="sm" 
                         icon={<FiEdit2 size={18} />} 
-                        onClick={() => router.push(`/create-report?editId=${r.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/create-report?editId=${r.id}`);
+                        }}
                         style={{ color: "#d97706" }}
                       />
                       <Button 
                         variant="icon" 
                         size="sm" 
                         icon={<MdDownload size={18} />} 
-                        onClick={() => handleDownloadPDF(r.id)} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadPDF(r.id);
+                        }} 
                         disabled={generatingId === r.id} 
                       />
                       <Button 
                         variant="icon" 
                         size="sm" 
                         icon={<FiMessageSquare size={18} />} 
-                        onClick={() => handleOpenWhatsappModal(r.id)} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenWhatsappModal(r.id);
+                        }} 
                         disabled={generatingId === r.id}
                         style={{ color: "#16a34a" }}
                       />

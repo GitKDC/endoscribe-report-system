@@ -5,9 +5,9 @@ import { useSearchParams } from "next/navigation";
 import ReportForm from "@/components/ReportForm";
 import ImageUploader from "@/components/ImageUploader";
 import ReportPreview from "@/components/ReportPreview";
-import { generatePDF, printReport, exportAsImage } from "@/utils/reportGenerator";
+import { generatePDF, printReport, exportAsWord } from "@/utils/reportGenerator";
 import { buildEndoUrl } from "@/utils/buildEndoUrl";
-import { FiPrinter, FiDownload, FiImage, FiRefreshCw, FiEdit3, FiAlertTriangle } from "react-icons/fi";
+import { FiPrinter, FiDownload, FiImage, FiRefreshCw, FiEdit3, FiAlertTriangle, FiFileText } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -106,8 +106,8 @@ function CreateReportInner() {
   const [templateId, setTemplateId] = useState<number | null>(null);
 
   // ── Master Image Adjustments ────────────────────────────────────────────────
-  const [masterBrightness, setMasterBrightness] = useState(120);
-  const [masterContrast, setMasterContrast] = useState(120);
+  const [masterBrightness, setMasterBrightness] = useState(110);
+  const [masterContrast, setMasterContrast] = useState(108);
 
   // 🔥 NEW: doctors selected for this report's footer
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -116,7 +116,7 @@ function CreateReportInner() {
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [printState,  setPrintState]  = useState<ActionState>("idle");
   const [pdfState,    setPdfState]    = useState<ActionState>("idle");
-  const [imgState,    setImgState]    = useState<ActionState>("idle");
+  const [wordState,   setWordState]   = useState<ActionState>("idle");
   const [toasts,      setToasts]      = useState<ToastMessage[]>([]);
   const [mounted,     setMounted]     = useState(false);
 
@@ -131,6 +131,19 @@ function CreateReportInner() {
   useEffect(() => {
     const initEditMode = async () => {
       if (editId && (window as any).api) {
+        // Clear previous state immediately to prevent "ghost" data during client-side navigation
+        setPatientName("");
+        setPatientId(null);
+        setPatientPhone("");
+        setPatientAge("");
+        setPatientCity("");
+        setReferralName("");
+        setReferralId(null);
+        setReferralPhone("");
+        setSections([]);
+        setImages([]);
+        setReportNumber(null);
+        
         try {
           setLoading(true);
           const report = await (window as any).api.getReport(parseInt(editId, 10));
@@ -272,10 +285,11 @@ function CreateReportInner() {
         if (!data || data.length === 0) throw new Error("No templates found");
         setTemplates(data);
         
-        // Auto-fill sections for initType if no draft exists
+        // Auto-fill sections for initType if no draft exists AND not in edit mode
         const cat = cats?.find((c: any) => c.name === initType);
         const hasDraft = !!localStorage.getItem("endoscribe_draft_report");
-        if (cat && !hasDraft) {
+        const editIdStr = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("editId") : null;
+        if (cat && !hasDraft && !editIdStr) {
           setSections([...cat.default_sections]);
         }
       } catch (err) {
@@ -410,7 +424,7 @@ function CreateReportInner() {
     }
 
     // Check if at least some procedure content or images are present
-    const hasContent = sections.some(s => s.content.trim() !== "");
+    const hasContent = sections.some(s => (s.content || "").trim() !== "");
     const hasImages = images.length > 0;
     if (!hasContent && !hasImages) {
       addToast("Please add procedure content or at least one image", "error");
@@ -424,9 +438,17 @@ function CreateReportInner() {
     if (!validateForm()) return;
     runAction(setPrintState, printReport, "Sent to printer ✓", "Print failed");
   };
-  const handleExportImage = () => {
+  const handleExportWord = () => {
     if (!validateForm()) return;
-    runAction(setImgState,   () => exportAsImage(reportDate, patientName, patientAge, reportType, reportNumber ?? undefined), "Image exported ✓", "Export failed");
+    runAction(setWordState, () => exportAsWord(
+      reportDate, patientName, patientAge, reportType,
+      sections,
+      images.map(img => ({ ...img, brightness: masterBrightness, contrast: masterContrast })),
+      selectedDoctorObjects,
+      prefix,
+      reportNumber ?? undefined
+    ), "Word document saved ✨", "Save failed");
+
   };
 
   const handleDownloadPDF = () => {
@@ -531,7 +553,7 @@ function CreateReportInner() {
     // ── 2. Generate PDF (report number now visible in preview) ───────────────
     const result = await generatePDF(reportDate, patientName, patientAge, reportType, savedReportNo ?? undefined);
     if (result && result.absolutePath) {
-      alert(`PDF saved successfully to:\n${result.absolutePath}`);
+      console.log(`PDF saved successfully to:\n${result.absolutePath}`);
     }
   }, reportNumber ? `Report ${reportNumber} — PDF downloaded ✓` : "PDF downloaded ✓", "PDF failed");
   };
@@ -756,7 +778,7 @@ function CreateReportInner() {
                 onImagesUpdated={handleImagesUpdated}
                 onImageRemoved={handleImageRemoved}
                 onImageLabelChanged={handleImageLabelChanged}
-                maxImages={12}
+                maxImages={6}
               />
             </div>
 
@@ -781,12 +803,12 @@ function CreateReportInner() {
               </button>
 
               <button
-                onClick={handleExportImage}
-                disabled={imgState === "loading"}
+                onClick={handleExportWord}
+                disabled={wordState === "loading"}
                 onMouseEnter={btnHover} onMouseLeave={btnLeave}
-                style={{ ...btnBase, backgroundColor: "#0dcaf0", color: "#000", opacity: imgState === "loading" ? 0.75 : 1 }}
+                style={{ ...btnBase, backgroundColor: "#2b579a", color: "#fff", opacity: wordState === "loading" ? 0.75 : 1 }}
               >
-                {getLabel(imgState, <><FiImage style={{marginRight: 6}}/> Image</>, "Exporting…", "Exported")}
+                {getLabel(wordState, <><FiFileText style={{marginRight: 6}}/> Save as Word</>, "Saving…", "Saved")}
               </button>
 
               <button

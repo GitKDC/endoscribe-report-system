@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { FiSearch, FiX } from "react-icons/fi";
 import { Button } from "./ui/Button";
 
@@ -58,7 +59,14 @@ export const PreviousImagePicker: React.FC<PreviousImagePickerProps> = ({ onClos
     return `endo:///${path.replace(/\\/g, "/")}`;
   };
 
-  return (
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <div style={{
       position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
       background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", zIndex: 10000, 
@@ -160,6 +168,7 @@ export const PreviousImagePicker: React.FC<PreviousImagePickerProps> = ({ onClos
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
