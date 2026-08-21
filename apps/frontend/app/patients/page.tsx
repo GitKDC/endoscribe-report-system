@@ -64,6 +64,20 @@ export default function PatientsPage() {
     setPage(1);
   }, [search]);
 
+  // ── Auto-refresh when user navigates back to this page ───────────────────────
+  // In Electron + Next.js static export, pages are NOT unmounted on navigation.
+  // This means useEffect([]) only runs once. We listen for visibilitychange so
+  // the list always refreshes when the user switches back to this tab/page.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchPatients();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [search, page]);
+
   const handleExportCSV = async () => {
     if (!(window as any).api) return;
     try {

@@ -477,14 +477,23 @@ export const exportAsWord = async (
 
     // Render one section row
     const renderSection = (s: WordSection): string => {
-      if (s.isLine) return `<tr><td style="border-bottom:1pt solid #bbb;padding:1pt 0;font-size:1pt;">&nbsp;</td></tr>`;
+      if (s.isLine && !s.content && !s.title) {
+        return `<tr><td style="border-bottom:1pt solid #bbb;padding:1pt 0;font-size:1pt;">&nbsp;</td></tr>`;
+      }
       if (s.isHeading) return `<tr><td style="padding:2pt 0 0;font-weight:700;font-size:11.5pt;border-bottom:1.5pt solid #222;">${s.title}</td></tr>`;
-      const safeContent = (s.content || "")
-        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-        .replace(/\*\*(.*?)\*\*/g,"<b>$1</b>")
-        .replace(/\*(.*?)\*/g,"<i>$1</i>")
-        .replace(/!!(.*?)!!/g,"<span style='color:#cc0000;'>$1</span>")
-        .replace(/\n/g,"<br>");
+      let safeContent = s.content || "";
+      if (!safeContent.includes("<p>") && !safeContent.includes("<strong>") && !safeContent.includes("<span")) {
+        safeContent = safeContent
+          .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+          .replace(/\*\*(.*?)\*\*/g,"<b>$1</b>")
+          .replace(/\*(.*?)\*/g,"<i>$1</i>")
+          .replace(/!!(.*?)!!/g,"<span style='color:#cc0000;'>$1</span>")
+          .replace(/&&(.*?)&&/g,"<span style='color:#16a34a;'>$1</span>")
+          .replace(/%%(.*?)%%/g,"<span style='color:#d97706;'>$1</span>")
+          .replace(/\n/g,"<br>");
+      } else {
+        safeContent = safeContent.replace(/^<p[^>]*>/, "").replace(/<\/p>$/, "").replace(/<\/p>\s*<p[^>]*>/g, "<br>");
+      }
 
       if (s.highlight) {
         return `<tr><td style="padding:1pt 0;">
@@ -493,6 +502,10 @@ export const exportAsWord = async (
           </table>
           <p style="margin:0 0 1pt;font-size:10pt;">${safeContent}</p>
         </td></tr>`;
+      }
+
+      if (s.isLine) {
+        return `<tr><td style="padding:0;"><p style="margin:0 0 1pt;font-size:10pt;">${safeContent || s.title}</p></td></tr>`;
       }
 
       return `<tr><td style="padding:0;"><p style="margin:0 0 1pt;font-size:10pt;"><b>${s.title}:-</b>&nbsp;${safeContent}</p></td></tr>`;

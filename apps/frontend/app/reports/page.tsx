@@ -99,6 +99,20 @@ export default function ReportsPage() {
     fetchReports();
   }, [page, search, startDate, endDate, procedure, doctorId]);
 
+  // ── Auto-refresh when user navigates back to this page ───────────────────────
+  // In Electron + Next.js static export, pages are NOT unmounted on navigation.
+  // This means the list only refreshes when filters change. We listen for
+  // visibilitychange so newly created reports always appear immediately.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchReports();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [page, search, startDate, endDate, procedure, doctorId]);
+
   useEffect(() => {
     const fetchDoctors = async () => {
       if (!(window as any).api) return;

@@ -47,15 +47,27 @@ db.serialize(() => {
   db.run("PRAGMA busy_timeout = 10000");
 });
 
-const migrationPath = path.join(__dirname, "migration.sql");
-if (fs.existsSync(migrationPath)) {
-  const migration = fs.readFileSync(migrationPath, "utf-8");
-  db.exec(migration, (err) => {
+const schemaPath = path.join(__dirname, "schema.sql");
+const seedPath = path.join(__dirname, "seed.sql");
+
+if (fs.existsSync(schemaPath)) {
+  const schema = fs.readFileSync(schemaPath, "utf-8");
+  db.exec(schema, (err) => {
     if (err) {
-      console.error("❌ Migration error:", err.message);
+      console.error("❌ Schema error:", err.message);
     } else {
-      console.log("✅ Migrations completed");
+      console.log("✅ Schema loaded");
       
+      db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
+        if (!err && row && row.count === 0 && fs.existsSync(seedPath)) {
+          const seed = fs.readFileSync(seedPath, "utf-8");
+          db.exec(seed, (seedErr) => {
+            if (seedErr) console.error("❌ Seed error:", seedErr.message);
+            else console.log("✅ Default templates & categories seeded");
+          });
+        }
+      });
+
       // Auto-migrate new columns
       db.run("ALTER TABLE images ADD COLUMN nbi_label TEXT", () => {});
       db.run("ALTER TABLE images ADD COLUMN brightness REAL", () => {});
@@ -75,6 +87,7 @@ if (fs.existsSync(migrationPath)) {
       db.run("ALTER TABLE reports ADD COLUMN referral_doctor_id INTEGER REFERENCES referral_doctors(id)", () => {});
       db.run("ALTER TABLE patients ADD COLUMN city TEXT", () => {});
       db.run("ALTER TABLE patients ADD COLUMN procedure_type TEXT", () => {});
+      db.run("ALTER TABLE doctors ADD COLUMN is_active INTEGER DEFAULT 1", () => {});
       
       // Cloud sync columns
       const tables = ['reports', 'patients', 'images', 'referral_doctors', 'doctors', 'templates'];
@@ -86,7 +99,7 @@ if (fs.existsSync(migrationPath)) {
     }
   });
 } else {
-  console.warn("⚠️ Migration file not found at:", migrationPath);
+  console.warn("⚠️ Schema file not found at:", schemaPath);
 }
 
 module.exports = db;

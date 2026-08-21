@@ -23,6 +23,7 @@ type Doctor = {
   designation?: string;
   is_default?: number;
   display_order?: number;
+  is_active?: number;
 };
 
 export default function ProfilePage() {
@@ -35,6 +36,7 @@ export default function ProfilePage() {
   const [fQual, setFQual] = useState("");
   const [fDesig, setFDesig] = useState("");
   const [fDefault, setFDefault] = useState(false);
+  const [fActive, setFActive] = useState(true);
 
   const [delDocId, setDelDocId] = useState<number | null>(null);
   const [toast, setToast] = useState<{msg: string, ok: boolean} | null>(null);
@@ -61,6 +63,7 @@ export default function ProfilePage() {
     setFQual("");
     setFDesig("");
     setFDefault(false);
+    setFActive(true);
     setShowDocForm(true);
   };
 
@@ -70,6 +73,7 @@ export default function ProfilePage() {
     setFQual(d.qualifications || "");
     setFDesig(d.designation || "");
     setFDefault(!!d.is_default);
+    setFActive(d.is_active !== 0);
     setShowDocForm(true);
   };
 
@@ -79,7 +83,8 @@ export default function ProfilePage() {
       name: fName.trim(),
       qualifications: fQual.trim(),
       designation: fDesig.trim(),
-      is_default: fDefault ? 1 : 0
+      is_default: fDefault ? 1 : 0,
+      is_active: fActive ? 1 : 0
     };
 
     if (editDoc) {
@@ -99,10 +104,16 @@ export default function ProfilePage() {
 
   const confirmDeleteDoctor = async (id: number) => {
     if ((window as any).api) {
-      await (window as any).api.deleteDoctor(id);
-      setDelDocId(null);
-      showToast("Doctor removed");
-      loadDoctors();
+      try {
+        await (window as any).api.deleteDoctor(id);
+        setDelDocId(null);
+        showToast("Doctor removed");
+        loadDoctors();
+      } catch (err: any) {
+        setDelDocId(null);
+        const msg = err.message.replace("Error invoking remote method 'delete-doctor': Error: ", "");
+        showToast(msg, false);
+      }
     }
   };
 
@@ -178,8 +189,13 @@ export default function ProfilePage() {
               >
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: "15px", fontWeight: "700", color: THEME.navy, marginBottom: "4px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: "700", color: THEME.navy, marginBottom: "4px", display: "flex", alignItems: "center", gap: "8px" }}>
                       {d.name}
+                      {d.is_active === 0 && (
+                        <span style={{ fontSize: "11px", fontWeight: "600", color: THEME.muted, background: "#e2e8f0", padding: "2px 6px", borderRadius: "4px" }}>
+                          Archived
+                        </span>
+                      )}
                     </div>
                     {d.qualifications && (
                       <div style={{ fontSize: "13px", color: THEME.muted, marginBottom: "2px" }}>
@@ -271,6 +287,14 @@ export default function ProfilePage() {
                   style={{ width: "16px", height: "16px", accentColor: THEME.teal }}
                 />
                 <span style={{ fontWeight: "500", color: THEME.text }}>Set as default doctor</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={fActive} onChange={e => setFActive(e.target.checked)}
+                  style={{ width: "16px", height: "16px", accentColor: THEME.teal }}
+                />
+                <span style={{ fontWeight: "500", color: THEME.text }}>Active Status</span>
               </label>
             </div>
             <div style={{ padding: "16px 20px", background: "#f8fafc", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "12px" }}>

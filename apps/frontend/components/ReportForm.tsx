@@ -3,6 +3,7 @@ import { IoIosArrowDown } from "react-icons/io";
 import { SlCalender } from "react-icons/sl";
 import { FiPlus, FiX, FiKey, FiUser, FiFileText, FiActivity } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
+import RichTextEditor from "./RichTextEditor";
 
 const THEME = {
   navy:    "#1a3a52",
@@ -100,8 +101,20 @@ const ReportForm: React.FC<ReportFormProps> = ({
       } else {
         setAge(patientAge.replace(/\D/g, ''));
       }
+    } else {
+      setAge("");
     }
   }, [patientAge]);
+
+  useEffect(() => {
+    if (prefix === "Mr." || prefix === "Master.") {
+      setGender("M");
+      if (age) onPatientAgeChange(`${age}Yrs/M`);
+    } else if (prefix === "Mrs." || prefix === "Miss.") {
+      setGender("F");
+      if (age) onPatientAgeChange(`${age}Yrs/F`);
+    }
+  }, [prefix, age, onPatientAgeChange]);
 
   useEffect(() => {
     if (templateId !== undefined && templateId !== null) {
@@ -296,10 +309,10 @@ const ReportForm: React.FC<ReportFormProps> = ({
     setNewFieldTitle("");
   };
 
-  const applyFormat = (i: number, ta: HTMLTextAreaElement, type: "bold" | "italic" | "red") => {
+  const applyFormat = (i: number, ta: HTMLTextAreaElement, type: "bold" | "italic" | "red" | "yellow" | "green") => {
     const { selectionStart: s, selectionEnd: e, value } = ta;
     if (s === e) return;
-    const w = type === "bold" ? "**" : type === "italic" ? "*" : "!!";
+    const w = type === "bold" ? "**" : type === "italic" ? "*" : type === "yellow" ? "%%" : type === "green" ? "&&" : "!!";
     const nc = value.slice(0, s) + w + value.slice(s, e) + w + value.slice(e);
     setSections(p => p.map((sec, idx) => idx === i ? { ...sec, content: nc } : sec));
   };
@@ -770,18 +783,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
                           Standalone Line
                         </label>
                         <div style={{ display: "flex", gap: "4px" }}>
-                          {(["bold", "italic", "red"] as const).map(fmt => (
-                            <button key={fmt} className="rfmt" type="button"
-                              onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
-                              style={{
-                                padding: "2px 7px", border: `1px solid ${THEME.border}`,
-                                borderRadius: "5px", cursor: "pointer", fontSize: "12px",
-                                fontWeight: fmt === "bold" ? "700" : "400",
-                                fontStyle: fmt === "italic" ? "italic" : "normal",
-                                background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
-                                transition: "background 0.12s",
-                              }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
-                          ))}
                           <button className="rrem" onClick={() => deleteSection(i)} style={{
                             padding: "2px 8px", border: `1px solid ${THEME.border}`,
                             borderRadius: "5px", cursor: "pointer", fontSize: "11px",
@@ -791,18 +792,13 @@ const ReportForm: React.FC<ReportFormProps> = ({
                           }}><FiX style={{ marginRight: 4 }} /> Remove</button>
                         </div>
                       </div>
-                      <textarea id={`ta${i}`} value={section.content || section.title || ""}
-                        onChange={e => updateSection(i, e.target.value)}
-                        onFocus={focus(fk)} onBlur={blur}
-                        rows={2}
-                        onKeyDown={e => {
-                          if (e.ctrlKey && e.key === "b") { e.preventDefault(); applyFormat(i, e.currentTarget, "bold"); }
-                          if (e.ctrlKey && e.key === "i") { e.preventDefault(); applyFormat(i, e.currentTarget, "italic"); }
-                        }}
-                        style={{
-                          ...inp(fk), resize: "vertical", lineHeight: 1.55,
-                          borderColor: act ? THEME.teal : THEME.border,
-                        }} />
+                      <div onClick={() => focus(fk)()}>
+                        <RichTextEditor 
+                          value={section.content || section.title || ""} 
+                          onChange={(html) => updateSection(i, html)}
+                          minHeight="60px"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -817,18 +813,6 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         </label>
 
                         <div style={{ display: "flex", gap: "4px" }}>
-                          {(["bold", "italic", "red"] as const).map(fmt => (
-                            <button key={fmt} className="rfmt" type="button"
-                              onClick={() => { const ta = document.getElementById(`ta${i}`) as HTMLTextAreaElement; if (ta) applyFormat(i, ta, fmt); }}
-                              style={{
-                                padding: "2px 7px", border: `1px solid ${THEME.border}`,
-                                borderRadius: "5px", cursor: "pointer", fontSize: "12px",
-                                fontWeight: fmt === "bold" ? "700" : "400",
-                                fontStyle: fmt === "italic" ? "italic" : "normal",
-                                background: "white", color: fmt === "red" ? "#f53a3a" : THEME.muted, fontFamily: "inherit",
-                                transition: "background 0.12s",
-                              }}>{fmt === "bold" ? "B" : fmt === "italic" ? "I" : "Red"}</button>
-                          ))}
                           {!isHL && (
                             <button className="rrem" onClick={() => deleteSection(i)} style={{
                               padding: "2px 8px", border: `1px solid ${THEME.border}`,
@@ -841,20 +825,14 @@ const ReportForm: React.FC<ReportFormProps> = ({
                         </div>
                       </div>
 
-                      <textarea id={`ta${i}`} value={section.content}
-                        onChange={e => updateSection(i, e.target.value)}
-                        onFocus={focus(fk)} onBlur={blur}
-                        rows={isHL ? 4 : 3}
-                        onKeyDown={e => {
-                          if (e.ctrlKey && e.key === "b") { e.preventDefault(); applyFormat(i, e.currentTarget, "bold"); }
-                          if (e.ctrlKey && e.key === "i") { e.preventDefault(); applyFormat(i, e.currentTarget, "italic"); }
-                        }}
-                        style={{
-                          ...inp(fk), resize: "vertical", lineHeight: 1.55,
-                          borderColor: isHL ? (act ? THEME.danger : THEME.highlightBorder) : (act ? THEME.teal : THEME.border),
-                          background: isHL ? THEME.highlight : THEME.white,
-                          boxShadow: act ? (isHL ? "0 0 0 3px rgba(220,53,69,0.12)" : "0 0 0 3px rgba(13,148,136,0.15)") : "none",
-                        }} />
+                      <div onClick={() => focus(fk)()}>
+                        <RichTextEditor 
+                          value={section.content || ""} 
+                          onChange={(html) => updateSection(i, html)}
+                          minHeight={isHL ? "100px" : "80px"}
+                          highlight={isHL}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

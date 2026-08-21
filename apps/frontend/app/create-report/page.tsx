@@ -5,9 +5,10 @@ import { useSearchParams } from "next/navigation";
 import ReportForm from "@/components/ReportForm";
 import ImageUploader from "@/components/ImageUploader";
 import ReportPreview from "@/components/ReportPreview";
+import RichTextEditor from "@/components/RichTextEditor";
 import { generatePDF, printReport, exportAsWord } from "@/utils/reportGenerator";
 import { buildEndoUrl } from "@/utils/buildEndoUrl";
-import { FiPrinter, FiDownload, FiImage, FiRefreshCw, FiEdit3, FiAlertTriangle, FiFileText } from "react-icons/fi";
+import { FiPrinter, FiDownload, FiImage, FiRefreshCw, FiEdit3, FiAlertTriangle, FiFileText, FiSave } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -20,6 +21,10 @@ type Template = {
     title: string;
     content: string;
     highlight?: boolean;
+    isHeading?: boolean;
+    isLine?: boolean;
+    isLineYellow?: boolean;
+    isLineGreen?: boolean;
   }[];
 };
 
@@ -121,12 +126,18 @@ function CreateReportInner() {
   const [mounted,     setMounted]     = useState(false);
 
   const [sections, setSections] = useState<
-    { title: string; content: string; highlight?: boolean }[]
+    { title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean; isLineYellow?: boolean; isLineGreen?: boolean }[]
   >([]);
 
   // ── Auto-Save Draft & Edit Mode Initialization ───────────────────────────────
   const [isDraftRestored, setIsDraftRestored] = useState(false);
   const [isEditModeLoaded, setIsEditModeLoaded] = useState(false);
+
+  // ── Save as Template modal ───────────────────────────────────────────────────
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [stmName, setStmName] = useState("");
+  const [stmCategory, setStmCategory] = useState("");
+  const [stmSections, setStmSections] = useState<{ title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean; isLineYellow?: boolean; isLineGreen?: boolean }[]>([]);
 
   useEffect(() => {
     const initEditMode = async () => {
@@ -308,7 +319,8 @@ function CreateReportInner() {
       try {
         if (!(window as any).api) return;
         const data = await (window as any).api.getDoctors();
-        setDoctors(data || []);
+        const activeDoctors = (data || []).filter((d: any) => d.is_active !== 0);
+        setDoctors(activeDoctors);
       } catch (err) {
         console.error("Failed to load doctors:", err);
       }
@@ -380,18 +392,44 @@ function CreateReportInner() {
     addToast("Form cleared", "success");
   };
 
+  // ── Save as Template handlers ───────────────────────────────────────────────
+  const handleOpenSaveTemplate = () => {
+    setStmName("");
+    setStmCategory(reportType || "");
+    setStmSections(sections.map(s => ({ ...s })));
+    setShowSaveTemplateModal(true);
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!stmName.trim()) {
+      addToast("Template name is required", "error");
+      return;
+    }
+    try {
+      const payload = { name: stmName.trim(), category: stmCategory, sections: stmSections };
+      const created = await (window as any).api.createTemplate(payload);
+      setTemplates(prev => [...prev, { id: created?.id ?? Date.now(), name: stmName.trim(), category: stmCategory, sections: stmSections }]);
+      setShowSaveTemplateModal(false);
+      addToast(`Template "${stmName.trim()}" saved ✓`, "success");
+    } catch (err) {
+      addToast("Failed to save template", "error");
+    }
+  };
+
   // ── Action button wrapper ─────────────────────────────────────────────────────
+  // successMsg is optional — if omitted, the caller handles its own toast
+  // (needed when the success message depends on async data like a report number)
   const runAction = async (
     setState: (s: ActionState) => void,
     fn: () => Promise<void>,
-    successMsg: string,
+    successMsg: string | null,
     errorMsg: string
   ) => {
     setState("loading");
     try {
       await fn();
       setState("success");
-      addToast(successMsg, "success");
+      if (successMsg) addToast(successMsg, "success");
     } catch (err) {
       setState("error");
       addToast(
@@ -555,7 +593,17 @@ function CreateReportInner() {
     if (result && result.absolutePath) {
       console.log(`PDF saved successfully to:\n${result.absolutePath}`);
     }
-  }, reportNumber ? `Report ${reportNumber} — PDF downloaded ✓` : "PDF downloaded ✓", "PDF failed");
+
+    // ── 3. Show success toast with the REAL report number ────────────────────
+    // We call addToast here (not via runAction's successMsg arg) because
+    // savedReportNo is a local variable resolved during this async call.
+    // If we passed it as a string to runAction, it would be evaluated at
+    // click-time when reportNumber state is still null → stale closure bug.
+    addToast(
+      savedReportNo ? `Report ${savedReportNo} — PDF downloaded ✓` : "PDF downloaded ✓",
+      "success"
+    );
+  }, null, "PDF failed");  // null = runAction won't show its own success toast
   };
 
   // 🔥 NEW: resolve selected doctor IDs into full doctor objects, in the
@@ -784,6 +832,21 @@ function CreateReportInner() {
 
             {/* ── Action buttons ─────────────────────────────────────────── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "28px" }}>
+              {/* Save as Template button — full width above the 2-col grid */}
+              <button
+                onClick={handleOpenSaveTemplate}
+                style={{
+                  ...btnBase,
+                  backgroundColor: "#0d9488",
+                  gridColumn: "1 / -1",
+                  marginBottom: "4px",
+                }}
+                onMouseEnter={btnHover}
+                onMouseLeave={btnLeave}
+              >
+                <FiSave style={{ marginRight: 6 }} /> Save as Template
+              </button>
+
               <button
                 onClick={handlePrint}
                 disabled={printState === "loading"}
@@ -864,6 +927,173 @@ function CreateReportInner() {
 
         </div>
       </div>
+      {/* ── Save as Template Modal ─────────────────────────────── */}
+      {showSaveTemplateModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          zIndex: 9999, display: "flex", alignItems: "flex-start",
+          justifyContent: "center", overflowY: "auto", padding: "24px",
+        }}>
+          <div style={{
+            background: "white", borderRadius: "16px",
+            width: "100%", maxWidth: "680px",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+            fontFamily: "Inter, sans-serif",
+            marginTop: "auto", marginBottom: "auto",
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              background: "white", color: "#1a3a52",
+              padding: "20px 24px", borderRadius: "16px 16px 0 0",
+              borderBottom: "1px solid #e2e8f0",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <h2 style={{ margin: 0, fontSize: "17px", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                <FiSave /> Save Current Report as Template
+              </h2>
+              <button
+                onClick={() => setShowSaveTemplateModal(false)}
+                style={{
+                  background: "transparent", border: "none",
+                  color: "#64748b", width: "30px", height: "30px",
+                  borderRadius: "50%", cursor: "pointer", fontSize: "22px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "18px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#64748b", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Template Name *
+                  </label>
+                  <input
+                    value={stmName}
+                    onChange={e => setStmName(e.target.value)}
+                    placeholder="e.g. Barrett's Esophagus"
+                    autoFocus
+                    style={{
+                      padding: "9px 12px", border: "1.5px solid #e2e8f0",
+                      borderRadius: "7px", fontSize: "13px", fontFamily: "inherit",
+                      outline: "none", width: "100%", boxSizing: "border-box" as const, background: "white",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#64748b", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Category
+                  </label>
+                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <select
+                      value={stmCategory}
+                      onChange={e => setStmCategory(e.target.value)}
+                      style={{
+                        padding: "9px 12px", border: "1.5px solid #e2e8f0",
+                        borderRadius: "7px", fontSize: "13px", fontFamily: "inherit",
+                        outline: "none", width: "160px", boxSizing: "border-box" as const,
+                        background: "white", appearance: "none" as const, paddingRight: "28px",
+                      }}
+                    >
+                      {categories.map((c: any) => <option key={c.id ?? c.name} value={c.name}>{c.name}</option>)}
+                    </select>
+                    <div style={{ position: "absolute", right: "10px", pointerEvents: "none", color: "#64748b", display: "flex" }}>▾</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sections preview (editable) */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <label style={{ fontSize: "12px", fontWeight: "600", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Sections
+                  </label>
+                  <button
+                    onClick={() => setStmSections(p => [...p, { title: "", content: "" }])}
+                    style={{
+                      fontSize: "12px", color: "#0d9488", background: "#ccfbf1",
+                      border: "none", borderRadius: "6px", cursor: "pointer",
+                      padding: "4px 12px", fontWeight: "600", fontFamily: "inherit",
+                    }}
+                  >+ Add Section</button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "360px", overflowY: "auto", paddingRight: "4px" }}>
+                  {stmSections.map((s, i) => (
+                    <div key={i} style={{
+                      border: `1.5px solid ${s.highlight ? "#fca5a5" : "#e2e8f0"}`,
+                      borderRadius: "10px", padding: "12px",
+                      background: s.highlight ? "#fff7f7" : "#fafafa",
+                    }}>
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "center" }}>
+                        <input
+                          value={s.title}
+                          onChange={e => setStmSections(p => p.map((x, idx) => idx === i ? { ...x, title: e.target.value } : x))}
+                          placeholder="Field name"
+                          style={{
+                            padding: "9px 12px", border: "1.5px solid #e2e8f0",
+                            borderRadius: "7px", fontSize: "13px", fontFamily: "inherit",
+                            outline: "none", flex: 1, fontWeight: "600", background: "white",
+                          }}
+                        />
+                        <button
+                          onClick={() => setStmSections(p => p.map((x, idx) => idx === i ? { ...x, highlight: !x.highlight } : x))}
+                          style={{
+                            padding: "5px 10px",
+                            border: `1.5px solid ${s.highlight ? "#fca5a5" : "#e2e8f0"}`,
+                            borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", background: s.highlight ? "#fee2e2" : "white",
+                            color: s.highlight ? "#dc2626" : "#64748b", fontFamily: "inherit", whiteSpace: "nowrap" as const,
+                          }}
+                        >{s.highlight ? "★ Key" : "☆ Key"}</button>
+                        <button
+                          onClick={() => setStmSections(p => p.filter((_, idx) => idx !== i))}
+                          style={{
+                            padding: "5px 9px", border: "1px solid #fecaca",
+                            borderRadius: "6px", cursor: "pointer",
+                            background: "#fef2f2", color: "#dc2626", fontSize: "13px",
+                          }}
+                        >✕</button>
+                      </div>
+                      {!s.isHeading && !s.isLine && (
+                        <div style={{ marginTop: "4px" }}>
+                          <RichTextEditor
+                            value={s.content}
+                            onChange={html => setStmSections(p => p.map((x, idx) => idx === i ? { ...x, content: html } : x))}
+                            minHeight="60px"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", paddingTop: "4px" }}>
+                <button
+                  onClick={() => setShowSaveTemplateModal(false)}
+                  style={{
+                    padding: "9px 20px", border: "1.5px solid #e2e8f0",
+                    borderRadius: "8px", cursor: "pointer", fontFamily: "inherit",
+                    fontSize: "14px", fontWeight: "600", background: "white", color: "#64748b",
+                  }}
+                >Cancel</button>
+                <button
+                  onClick={handleSaveTemplate}
+                  style={{
+                    padding: "9px 20px", border: "none",
+                    borderRadius: "8px", cursor: "pointer", fontFamily: "inherit",
+                    fontSize: "14px", fontWeight: "600", background: "#1a3a52", color: "white",
+                  }}
+                >Create Template</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

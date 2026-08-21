@@ -3,7 +3,13 @@ import { FiCamera, FiSearch } from "react-icons/fi";
 import { MdDragIndicator } from "react-icons/md";
 import { PreviousImagePicker } from "./PreviousImagePicker";
 
-interface ImageData {
+export interface Annotation {
+  text: string;
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+  color: "red" | "yellow" | "white";
+}
+
+export interface ImageData {
   id: string;
   url: string;
   label: string;
@@ -12,6 +18,7 @@ interface ImageData {
   brightness?: number;
   filePath?: string;
   contrast?: number;
+  annotations?: Annotation[];
 }
 
 interface ImageUploaderProps {
@@ -227,29 +234,93 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   />
                   
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: "bold", cursor: "pointer", color: "#007bff" }}>
-                      <input
-                        type="checkbox"
-                        checked={img.isNbi || false}
-                        onChange={(e) => {
-                          const updated = images.map((i) =>
-                            i.id === img.id
-                              ? {
-                                  ...i,
-                                  isNbi: e.target.checked,
-                                  nbiLabel: e.target.checked ? "NBI" : undefined,
-                                }
-                              : i
-                          );
-                          onImagesUpdated(updated);
-                        }}
-                        style={{ accentColor: "#007bff", cursor: "pointer", margin: 0 }}
-                      />
-                      NBI Tag
-                    </label>
-                  </div>
-                </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: "bold", cursor: "pointer", color: "#007bff" }}>
+                        <input
+                          type="checkbox"
+                          checked={img.isNbi || false}
+                          onChange={(e) => {
+                            const updated = images.map((i) =>
+                              i.id === img.id
+                                ? {
+                                    ...i,
+                                    isNbi: e.target.checked,
+                                    nbiLabel: e.target.checked ? "NBI" : undefined,
+                                  }
+                                : i
+                            );
+                            onImagesUpdated(updated);
+                          }}
+                          style={{ accentColor: "#007bff", cursor: "pointer", margin: 0 }}
+                        />
+                        NBI Tag
+                      </label>
+                    </div>
 
+                    {/* Annotations UI */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                      {(img.annotations || []).map((ann, annIdx) => (
+                        <div key={annIdx} style={{ display: "flex", gap: 4, alignItems: "center", background: "#fff", padding: 4, borderRadius: 3, border: "1px solid #ddd" }}>
+                          <input
+                            type="text"
+                            value={ann.text}
+                            placeholder="Label text"
+                            onChange={(e) => {
+                              const newAnns = [...(img.annotations || [])];
+                              newAnns[annIdx] = { ...ann, text: e.target.value };
+                              onImagesUpdated(images.map(i => i.id === img.id ? { ...i, annotations: newAnns } : i));
+                            }}
+                            style={{ padding: 4, border: "1px solid #ddd", borderRadius: 3, fontSize: 10, flex: 1 }}
+                          />
+                          <select
+                            value={ann.position}
+                            onChange={(e) => {
+                              const newAnns = [...(img.annotations || [])];
+                              newAnns[annIdx] = { ...ann, position: e.target.value as any };
+                              onImagesUpdated(images.map(i => i.id === img.id ? { ...i, annotations: newAnns } : i));
+                            }}
+                            style={{ padding: 4, border: "1px solid #ddd", borderRadius: 3, fontSize: 10 }}
+                          >
+                            <option value="top-left">Top-L</option>
+                            <option value="top-right">Top-R</option>
+                            <option value="bottom-left">Bot-L</option>
+                            <option value="bottom-right">Bot-R</option>
+                            <option value="center">Center</option>
+                          </select>
+                          <select
+                            value={ann.color}
+                            onChange={(e) => {
+                              const newAnns = [...(img.annotations || [])];
+                              newAnns[annIdx] = { ...ann, color: e.target.value as any };
+                              onImagesUpdated(images.map(i => i.id === img.id ? { ...i, annotations: newAnns } : i));
+                            }}
+                            style={{ padding: 4, border: "1px solid #ddd", borderRadius: 3, fontSize: 10 }}
+                          >
+                            <option value="red">Red</option>
+                            <option value="yellow">Yellow</option>
+                            <option value="white">White</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const newAnns = (img.annotations || []).filter((_, i) => i !== annIdx);
+                              onImagesUpdated(images.map(i => i.id === img.id ? { ...i, annotations: newAnns } : i));
+                            }}
+                            style={{ padding: "2px 6px", background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 3, cursor: "pointer", fontSize: 10 }}
+                          >✕</button>
+                        </div>
+                      ))}
+                      {(!img.annotations || img.annotations.length < 3) && (
+                        <button
+                          onClick={() => {
+                            const newAnns = [...(img.annotations || []), { text: "", position: "top-left", color: "yellow" } as const];
+                            onImagesUpdated(images.map(i => i.id === img.id ? { ...i, annotations: newAnns } : i));
+                          }}
+                          style={{ alignSelf: "flex-start", padding: "3px 6px", fontSize: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 4, cursor: "pointer", color: "#475569" }}
+                        >
+                          + Add Text Label
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 <button
                   onClick={() => onImageRemoved(img.id)}
                   style={{

@@ -32,6 +32,7 @@ type Doctor = {
   designation?: string;
   is_default?: number;
   display_order?: number;
+  is_active?: number;
 };
 
 export default function Dashboard() {
@@ -57,8 +58,9 @@ export default function Dashboard() {
   // form state for doctor modal
   const [fName, setFName]   = useState("");
   const [fQual, setFQual]   = useState("");
-  const [fDesig, setFDesig] = useState("");
-  const [fDefault, setFDefault] = useState(true);
+  const [fDesig, setFDesig]         = useState("");
+  const [fDefault, setFDefault]     = useState(false);
+  const [fActive, setFActive]       = useState(true);
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 60000);
@@ -78,6 +80,21 @@ export default function Dashboard() {
         }
       });
     }
+  }, []);
+
+  // ── Auto-refresh stats when user navigates back to Dashboard ─────────────────
+  // In Electron + Next.js static export, the dashboard is never unmounted.
+  // Stats (today's reports, total patients) stay stale unless we re-fetch.
+  // visibilitychange fires when the Electron window regains focus or when
+  // the user navigates back from Create Report → Dashboard.
+  useEffect(() => {
+    const refreshStats = () => {
+      if (document.visibilityState === "visible" && (window as any).api) {
+        (window as any).api.getDashboardStats().then(setStats).catch(console.error);
+      }
+    };
+    document.addEventListener("visibilitychange", refreshStats);
+    return () => document.removeEventListener("visibilitychange", refreshStats);
   }, []);
 
   const loadDoctors = async () => {
@@ -251,7 +268,7 @@ export default function Dashboard() {
                   <FiUsers style={{ marginRight: "8px" }} /> Doctors
                 </h3>
                 <button
-                  onClick={() => { setEditDoc(null); setFName(""); setFQual(""); setFDesig(""); setFDefault(true); setShowDocModal(true); }}
+                  onClick={() => { setEditDoc(null); setFName(""); setFQual(""); setFDesig(""); setFDefault(false); setFActive(true); setShowDocModal(true); }}
                   style={{
                     fontSize: "12px", color: THEME.teal, background: "none",
                     border: "none", cursor: "pointer", fontWeight: "600", fontFamily: "inherit",
@@ -267,11 +284,14 @@ export default function Dashboard() {
                     padding: "10px 12px", borderRadius: "8px", borderBottom: i < doctors.length - 1 ? `1px solid ${THEME.border}` : "none",
                   }}>
                     <div>
-                      <div style={{ fontSize: "13px", fontWeight: "600", color: THEME.text }}>{d.name}</div>
+                      <div style={{ fontSize: "13px", fontWeight: "600", color: THEME.text, display: "flex", alignItems: "center", gap: "6px" }}>
+                        {d.name}
+                        {d.is_active === 0 && <span style={{ fontSize: "10px", background: "#e2e8f0", color: THEME.muted, padding: "2px 4px", borderRadius: "4px" }}>Archived</span>}
+                      </div>
                       <div style={{ fontSize: "11px", color: THEME.muted }}>{d.qualifications} {d.designation ? `• ${d.designation}` : ""}</div>
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => { setEditDoc(d); setFName(d.name); setFQual(d.qualifications || ""); setFDesig(d.designation || ""); setFDefault(Boolean(d.is_default)); setShowDocModal(true); }} style={{ background: "none", border: "none", color: THEME.teal, cursor: "pointer" }}><FiEdit2 size={14}/></button>
+                      <button onClick={() => { setEditDoc(d); setFName(d.name); setFQual(d.qualifications || ""); setFDesig(d.designation || ""); setFDefault(Boolean(d.is_default)); setFActive(d.is_active !== 0); setShowDocModal(true); }} style={{ background: "none", border: "none", color: THEME.teal, cursor: "pointer" }}><FiEdit2 size={14}/></button>
                       <button onClick={async () => { if(confirm("Delete doctor?")) { await (window as any).api.deleteDoctor(d.id); loadDoctors(); } }} style={{ background: "none", border: "none", color: THEME.danger, cursor: "pointer" }}><FiTrash2 size={14}/></button>
                     </div>
                   </div>
@@ -406,10 +426,14 @@ export default function Dashboard() {
                 <input type="checkbox" checked={fDefault} onChange={e=>setFDefault(e.target.checked)} />
                 Auto-select this doctor in new reports
               </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                <input type="checkbox" checked={fActive} onChange={e=>setFActive(e.target.checked)} />
+                Active Status
+              </label>
               <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
                 <button onClick={() => setShowDocModal(false)} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: `1px solid ${THEME.border}`, background: "white", cursor: "pointer" }}>Cancel</button>
                 <button onClick={async () => {
-                  const data = { name: fName, qualifications: fQual, designation: fDesig, is_default: fDefault ? 1 : 0 };
+                  const data = { name: fName, qualifications: fQual, designation: fDesig, is_default: fDefault ? 1 : 0, is_active: fActive ? 1 : 0 };
                   if (editDoc) await (window as any).api.updateDoctor(editDoc.id, data);
                   else await (window as any).api.createDoctor(data);
                   setShowDocModal(false);

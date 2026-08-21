@@ -7,6 +7,7 @@ interface ImageData {
   nbiLabel?: string;
   brightness?: number;
   contrast?: number;
+  annotations?: { text: string; position: string; color: string }[];
 }
 
 interface Section {
@@ -15,6 +16,8 @@ interface Section {
   highlight?: boolean;
   isHeading?: boolean;
   isLine?: boolean;
+  isLineYellow?: boolean;
+  isLineGreen?: boolean;
 }
 
 interface Doctor {
@@ -47,22 +50,6 @@ const REPORT_TITLE_MAP: Record<string, string> = {
   COLONOSCOPY: "COLONOSCOPY",
 };
 
-// Fallback doctors used only if none are selected/passed — keeps old
-// behaviour intact so existing reports never render an empty footer.
-const FALLBACK_DOCTORS: Doctor[] = [
-  {
-    id: -1,
-    name: "Dr Hrushikesh P. Chaudhari",
-    qualifications: "DNB (Gen. Med.), DNB (Gastro.)",
-    designation: "Consultant Gastroenterologist & Therapeutic Endoscopist",
-  },
-  {
-    id: -2,
-    name: "Dr Vaibhav Lamdhade",
-    qualifications: "DNB (Gen. Med.), DNB (Gastro.)",
-    designation: "Consultant Gastroenterologist & Therapeutic Endoscopist",
-  },
-];
 
 const ReportPreview: React.FC<ReportPreviewProps> = ({
   patientName,
@@ -88,7 +75,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
 
   // Only sections with actual content (or marked headings/lines) are rendered
   const visibleSections = sections.filter(
-    (s) => s.isHeading || s.isLine || (s.content && s.content.trim() !== "")
+    (s) => s.isHeading || s.isLine || s.isLineYellow || s.isLineGreen || (s.content && s.content.trim() !== "")
   );
 
   // Calculate approximate lines by counting explicit newlines + estimating wrapped lines
@@ -150,11 +137,39 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
       </span>
     ) : null;
 
-  // 🔥 NEW: which doctors actually render in the footer — falls back to
-  // the original hardcoded two doctors if nothing was selected, so this
-  // change is fully backward compatible.
-  const footerDoctors =
-    selectedDoctors && selectedDoctors.length > 0 ? selectedDoctors : FALLBACK_DOCTORS;
+  const AnnotationLabel = ({ annotation }: { annotation: { text: string; position: string; color: string } }) => {
+    if (!annotation.text) return null;
+    const posStyles: React.CSSProperties = { position: "absolute", zIndex: 2 };
+    switch (annotation.position) {
+      case "top-left": posStyles.top = "6px"; posStyles.left = "6px"; break;
+      case "top-right": posStyles.top = "6px"; posStyles.right = "6px"; break;
+      case "bottom-left": posStyles.bottom = "6px"; posStyles.left = "6px"; break;
+      case "bottom-right": posStyles.bottom = "6px"; posStyles.right = "6px"; break;
+      case "center": posStyles.top = "50%"; posStyles.left = "50%"; posStyles.transform = "translate(-50%, -50%)"; break;
+    }
+    const colors = {
+      red: { bg: "#fecaca", text: "#dc2626", border: "#f87171" },
+      yellow: { bg: "#fef08a", text: "#854d0e", border: "#facc15" },
+      white: { bg: "#ffffff", text: "#000000", border: "#d1d5db" }
+    };
+    const color = colors[annotation.color as keyof typeof colors] || colors.yellow;
+    
+    return (
+      <span style={{
+        ...posStyles,
+        backgroundColor: color.bg, color: color.text,
+        fontSize: "13px", fontWeight: "700", padding: "2px 6px",
+        borderRadius: "3px", border: `1px solid ${color.border}`,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+        WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+      }}>
+        {annotation.text}
+      </span>
+    );
+  };
+
+  // 🔥 NEW: which doctors actually render in the footer
+  const footerDoctors = selectedDoctors || [];
 
   return (
     /*
@@ -301,7 +316,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                 >
                   {section.title}
                 </div>
-              ) : section.isLine ? (
+              ) : section.isLine || section.isLineYellow || section.isLineGreen ? (
                 <div
                   key={index}
                   style={{
@@ -309,18 +324,22 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                     pageBreakInside: "avoid",
                   }}
                 >
-                  <span
-                    style={{ whiteSpace: "pre-wrap", color: "#111" }}
+                  <div
                     dangerouslySetInnerHTML={{ 
                       __html: (section.content || section.title || "")
+                        .replace(/^<p[^>]*>/, "")
+                        .replace(/<\/p>$/, "")
+                        .replace(/<\/p>\s*<p[^>]*>/g, "<br>")
                         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                         .replace(/\*(.*?)\*/g, "<em>$1</em>")
                         .replace(/!!(.*?)!!/g, '<span style="color: #f53a3a;">$1</span>')
+                        .replace(/&&(.*?)&&/g, '<span style="color: #16a34a;">$1</span>')
+                        .replace(/%%(.*?)%%/g, '<span style="color: #d97706;">$1</span>')
                     }}
                   />
                 </div>
               ) : (
-                <p
+                <div
                   key={index}
                   style={{
                     marginBottom: paraGap,
@@ -343,16 +362,21 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                       {section.title}:-{" "}
                     </strong>
                   )}
-                  <span
-                    style={{ whiteSpace: "pre-line" }}
+                  <div
+                    style={{ display: "inline" }}
                     dangerouslySetInnerHTML={{
                       __html: (section.content || "")
+                        .replace(/^<p[^>]*>/, "")
+                        .replace(/<\/p>$/, "")
+                        .replace(/<\/p>\s*<p[^>]*>/g, "<br>")
                         .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
                         .replace(/\*(.*?)\*/g, "<em>$1</em>")
-                        .replace(/!!(.*?)!!/g, '<span style="color: #f53a3a;">$1</span>'),
+                        .replace(/!!(.*?)!!/g, '<span style="color: #f53a3a;">$1</span>')
+                        .replace(/&&(.*?)&&/g, '<span style="color: #16a34a;">$1</span>')
+                        .replace(/%%(.*?)%%/g, '<span style="color: #d97706;">$1</span>'),
                     }}
                   />
-                </p>
+                </div>
               )
             )}
           </div>
@@ -396,6 +420,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                     }}
                   />
                   <NbiLabel label={img.nbiLabel} />
+                  {(img.annotations || []).map((ann, i) => <AnnotationLabel key={i} annotation={ann} />)}
                 </div>
               ))}
             </div>
@@ -441,6 +466,7 @@ const ReportPreview: React.FC<ReportPreviewProps> = ({
                     }}
                   />
                   <NbiLabel label={img.nbiLabel} />
+                  {(img.annotations || []).map((ann, i) => <AnnotationLabel key={i} annotation={ann} />)}
                 </div>
               </div>
             ))}

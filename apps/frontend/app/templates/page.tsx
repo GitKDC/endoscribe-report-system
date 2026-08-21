@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FiSearch, FiEdit2, FiTrash2, FiSettings, FiPlus, FiFolder, FiChevronDown, FiX } from "react-icons/fi";
+import { FiSearch, FiEdit2, FiTrash2, FiSettings, FiPlus, FiFolder, FiChevronDown, FiX, FiAlertCircle, FiCheck, FiSave } from 'react-icons/fi';
+import RichTextEditor from "../../components/RichTextEditor";
 import { Button } from "@/components/ui/Button";
 
 const THEME = {
@@ -16,7 +17,7 @@ const THEME = {
   dangerBg:"#fef2f2",
 };
 
-type Section = { title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean };
+type Section = { title: string; content: string; highlight?: boolean; isHeading?: boolean; isLine?: boolean; isLineYellow?: boolean; isLineGreen?: boolean; };
 type Template = { id: number; name: string; category: string; sections: Section[] };
 type Category = { id: number; name: string; color_bg: string; color_fg: string; default_sections: Section[] };
 
@@ -119,7 +120,15 @@ export default function TemplatePage() {
   };
   const toggleLine           = (i: number, isCat = false) => {
     const setter = isCat ? setCSections : setFSections;
-    setter(p => p.map((s, idx) => idx === i ? { ...s, isLine: !s.isLine, isHeading: false } : s));
+    setter(p => p.map((s, idx) => idx === i ? { ...s, isLine: !s.isLine, isHeading: false, isLineYellow: false, isLineGreen: false } : s));
+  };
+  const toggleLineYellow           = (i: number, isCat = false) => {
+    const setter = isCat ? setCSections : setFSections;
+    setter(p => p.map((s, idx) => idx === i ? { ...s, isLineYellow: !s.isLineYellow, isHeading: false, isLine: false, isLineGreen: false } : s));
+  };
+  const toggleLineGreen           = (i: number, isCat = false) => {
+    const setter = isCat ? setCSections : setFSections;
+    setter(p => p.map((s, idx) => idx === i ? { ...s, isLineGreen: !s.isLineGreen, isHeading: false, isLine: false, isLineYellow: false } : s));
   };
   const removeSection        = (i: number, isCat = false) => {
     const setter = isCat ? setCSections : setFSections;
@@ -538,7 +547,33 @@ export default function TemplatePage() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {s.isLine ? "T Red" : "T Normal"}
+                          {s.isLine ? "T Red" : "T Red"}
+                        </button>
+                        <button
+                          onClick={() => toggleLineYellow(i, false)}
+                          title="Toggle yellow text line"
+                          style={{
+                            padding: "5px 10px", border: `1.5px solid ${s.isLineYellow ? "#fbbf24" : THEME.border}`,
+                            borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", background: s.isLineYellow ? "#fef3c7" : "white",
+                            color: s.isLineYellow ? "#d97706" : THEME.muted, fontFamily: "inherit",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.isLineYellow ? "T Yel" : "T Yel"}
+                        </button>
+                        <button
+                          onClick={() => toggleLineGreen(i, false)}
+                          title="Toggle green text line"
+                          style={{
+                            padding: "5px 10px", border: `1.5px solid ${s.isLineGreen ? "#4ade80" : THEME.border}`,
+                            borderRadius: "6px", cursor: "pointer", fontSize: "11px",
+                            fontWeight: "600", background: s.isLineGreen ? "#f0fdf4" : "white",
+                            color: s.isLineGreen ? "#16a34a" : THEME.muted, fontFamily: "inherit",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {s.isLineGreen ? "T Grn" : "T Grn"}
                         </button>
                         <button onClick={() => removeSection(i, false)} style={{
                           padding: "5px 9px", border: `1px solid #fecaca`,
@@ -547,13 +582,13 @@ export default function TemplatePage() {
                         }}>✕</button>
                       </div>
                       {(!s.isHeading && !s.isLine) && (
-                        <textarea
-                          value={s.content}
-                          onChange={e => updateSectionContent(i, e.target.value, false)}
-                          placeholder="Default content (leave empty if doctor fills it each time)"
-                          rows={2}
-                          style={{ ...inp, resize: "vertical", lineHeight: 1.5 }}
-                        />
+                        <div style={{ marginTop: "8px" }}>
+                          <RichTextEditor
+                            value={s.content}
+                            onChange={html => updateSectionContent(i, html, false)}
+                            minHeight="60px"
+                          />
+                        </div>
                       )}
                     </div>
                   ))}
@@ -706,7 +741,13 @@ export default function TemplatePage() {
                           }}>✕</button>
                         </div>
                         {(!s.isHeading && !s.isLine) && (
-                          <textarea value={s.content} onChange={e => updateSectionContent(i, e.target.value, true)} placeholder="Default content" rows={1} style={{ ...inp, resize: "vertical" }} />
+                          <div style={{ marginTop: "8px" }}>
+                            <RichTextEditor 
+                              value={s.content} 
+                              onChange={html => updateSectionContent(i, html, true)} 
+                              minHeight="60px" 
+                            />
+                          </div>
                         )}
                       </div>
                     ))}

@@ -39,21 +39,22 @@ const getDoctor = (id, db) => {
 // ── CREATE DOCTOR ─────────────────────────────────────────────
 const createDoctor = (data, db) => {
   return new Promise((resolve, reject) => {
-    const { name, qualifications, designation, is_default, display_order } = data;
+    const { name, qualifications, designation, is_default, display_order, is_active } = data;
 
     if (!name || !name.trim()) {
       return reject(new Error("Doctor name is required"));
     }
 
     db.run(
-      `INSERT INTO doctors (name, qualifications, designation, is_default, display_order)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO doctors (name, qualifications, designation, is_default, display_order, is_active)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         name.trim(),
         qualifications || "",
         designation || "",
         is_default ? 1 : 0,
         display_order ?? 0,
+        is_active ?? 1,
       ],
       function (err) {
         if (err) {
@@ -70,11 +71,11 @@ const createDoctor = (data, db) => {
 // ── UPDATE DOCTOR ─────────────────────────────────────────────
 const updateDoctor = (id, data, db) => {
   return new Promise((resolve, reject) => {
-    const { name, qualifications, designation, is_default, display_order } = data;
+    const { name, qualifications, designation, is_default, display_order, is_active } = data;
 
     db.run(
       `UPDATE doctors
-       SET name = ?, qualifications = ?, designation = ?, is_default = ?, display_order = ?
+       SET name = ?, qualifications = ?, designation = ?, is_default = ?, display_order = ?, is_active = ?
        WHERE id = ?`,
       [
         name,
@@ -82,6 +83,7 @@ const updateDoctor = (id, data, db) => {
         designation || "",
         is_default ? 1 : 0,
         display_order ?? 0,
+        is_active ?? 1,
         id,
       ],
       function (err) {
@@ -102,6 +104,9 @@ const deleteDoctor = (id, db) => {
     db.run("DELETE FROM doctors WHERE id = ?", [id], function (err) {
       if (err) {
         console.error("DB Error in deleteDoctor:", err);
+        if (err.code === "SQLITE_CONSTRAINT") {
+          return reject(new Error("Cannot delete this doctor because they are assigned to existing reports. Please edit their details instead."));
+        }
         return reject(err);
       }
       console.log(`🗑️ Doctor deleted: ${id}`);
