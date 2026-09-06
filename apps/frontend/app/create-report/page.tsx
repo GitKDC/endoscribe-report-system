@@ -425,7 +425,7 @@ function CreateReportInner() {
     successMsg: string | null,
     errorMsg: string
   ) => {
-    setState("loading");
+    setState("loading"); 
     try {
       await fn();
       setState("success");
@@ -550,7 +550,8 @@ function CreateReportInner() {
         });
         savedReportNo = saved?.reportNumber ?? reportNumber;
       } catch (updateErr) {
-        console.error("DB update failed (non-fatal):", updateErr);
+        console.error("❌ DB update failed:", updateErr);
+        addToast("⚠️ Report update failed in database! Please try again.", "error");
       }
     } else if (!savedReportNo) {
       // Creating new report
@@ -583,8 +584,8 @@ function CreateReportInner() {
         savedReportNo = saved?.reportNumber ?? null;
         if (savedReportNo) setReportNumber(savedReportNo);
       } catch (saveErr) {
-        // Non-fatal — PDF still generates even if DB save fails
-        console.error("DB save failed (non-fatal):", saveErr);
+        console.error("❌ DB save failed:", saveErr);
+        addToast("⚠️ Report could not be saved to database! Please try again.", "error");
       }
     }
 
@@ -832,20 +833,6 @@ function CreateReportInner() {
 
             {/* ── Action buttons ─────────────────────────────────────────── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "28px" }}>
-              {/* Save as Template button — full width above the 2-col grid */}
-              <button
-                onClick={handleOpenSaveTemplate}
-                style={{
-                  ...btnBase,
-                  backgroundColor: "#0d9488",
-                  gridColumn: "1 / -1",
-                  marginBottom: "4px",
-                }}
-                onMouseEnter={btnHover}
-                onMouseLeave={btnLeave}
-              >
-                <FiSave style={{ marginRight: 6 }} /> Save as Template
-              </button>
 
               <button
                 onClick={handlePrint}
@@ -880,6 +867,21 @@ function CreateReportInner() {
                 style={{ ...btnBase, backgroundColor: "#6c757d" }}
               >
                 <FiRefreshCw style={{marginRight: 6}}/> Reset
+              </button>
+
+              {/* Save as Template button — full width above the 2-col grid */}
+              <button
+                onClick={handleOpenSaveTemplate}
+                style={{
+                  ...btnBase,
+                  backgroundColor: "#0d9488",
+                  gridColumn: "1 / -1",
+                  marginBottom: "4px",
+                }}
+                onMouseEnter={btnHover}
+                onMouseLeave={btnLeave}
+              >
+                <FiSave style={{ marginRight: 6 }} /> Save as Template
               </button>
             </div>
           </div>

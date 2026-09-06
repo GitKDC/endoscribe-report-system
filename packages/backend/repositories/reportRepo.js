@@ -27,25 +27,39 @@ const setSetting = (key, value) => {
 };
 
 // ─── Generate a unique report number  e.g.  SH-2026-047 ──────────────────────
+// Uses MAX of existing numbers (not COUNT) to avoid race conditions where two
+// concurrent saves could generate the same number and cause a UNIQUE violation.
 const generateReportNumber = async () => {
   const prefix = (await getSetting("report_prefix")) || "SH";
   const year = new Date().getFullYear();
+  const yearStr = String(year);
+  // Pattern to match e.g. "SH-2026-%" 
+  const pattern = `${prefix}-${yearStr}-%`;
+  // The numeric part starts after "SH-2026-" → length of prefix + 1 (dash) + 4 (year) + 1 (dash) + 1 (1-indexed)
+  const numStartPos = prefix.length + 1 + 4 + 1 + 1;
 
   return new Promise((resolve, reject) => {
     db.get(
-      "SELECT COUNT(*) as cnt FROM reports WHERE strftime('%Y', created_at) = ?",
-      [String(year)],
+      `SELECT MAX(CAST(SUBSTR(report_number, ?) AS INTEGER)) as maxNum 
+       FROM reports 
+       WHERE report_number LIKE ?`,
+      [numStartPos, pattern],
       (err, row) => {
         if (err) return reject(err);
-        const num = String((row?.cnt || 0) + 1).padStart(3, "0");
-        resolve(`${prefix}-${year}-${num}`);
+        const nextNum = (row?.maxNum || 0) + 1;
+        const num = String(nextNum).padStart(3, "0");
+        resolve(`${prefix}-${yearStr}-${num}`);
       }
     );
   });
 };
 
 // ─── Save a report to the DB ─────────────────────────────────────────────────
-const saveReport = async (data) => {
+// Includes automatic retry (up to 3 attempts) if a UNIQUE constraint violation
+// occurs on report_number due to concurrent saves during busy OT sessions.
+const saveReport = async (data, _retryCount = 0) => {
+  const MAX_RETRIES = 3;
+
   let {
     patientId,
     patientPrefix = "Mr.",
@@ -147,28 +161,46 @@ const saveReport = async (data) => {
         patientPhone || null,
         referralDoctorPhone || null,
       ],
-      function (err) {
+      async function (err) {
+        // 🔥 RETRY on UNIQUE constraint violation (race condition safety net)
+        if (err && err.message && err.message.includes("UNIQUE constraint failed: reports.report_number")) {
+          console.warn(`⚠️ Report number collision (${reportNumber}), retry ${_retryCount + 1}/${MAX_RETRIES}`);
+          if (_retryCount < MAX_RETRIES) {
+            try {
+              const result = await saveReport(data, _retryCount + 1);
+              return resolve(result);
+            } catch (retryErr) {
+              return reject(retryErr);
+            }
+          } else {
+            return reject(new Error(`Failed to save report after ${MAX_RETRIES} retries due to report number collision.`));
+          }
+        }
         if (err) return reject(err);
 
         const reportId = this.lastID;
 
-        // SAVE IMAGES
-        const stmt = db.prepare(
-          "INSERT INTO images (report_id, file_path, position, nbi_label, brightness, contrast) VALUES (?, ?, ?, ?, ?, ?)"
-        );
-
-        images.forEach((img, index) => {
-          console.log("📸 Image incoming:", img);
-
-          const finalPath = img.relativePath ? img.relativePath : img.filePath;
-          if (finalPath && finalPath.trim() !== "") {
-            stmt.run(reportId, finalPath, index, img.nbiLabel || null, img.brightness ?? 70, img.contrast ?? 70);
-          } else {
-            console.warn("Skipping image (no valid path):", img);
+        // SAVE IMAGES — properly awaited instead of fire-and-forget
+        try {
+          for (let index = 0; index < images.length; index++) {
+            const img = images[index];
+            const finalPath = img.relativePath ? img.relativePath : img.filePath;
+            if (finalPath && finalPath.trim() !== "") {
+              await new Promise((res, rej) => {
+                db.run(
+                  "INSERT INTO images (report_id, file_path, position, nbi_label, brightness, contrast) VALUES (?, ?, ?, ?, ?, ?)",
+                  [reportId, finalPath, index, img.nbiLabel || null, img.brightness ?? 70, img.contrast ?? 70],
+                  (e) => e ? rej(e) : res()
+                );
+              });
+            } else {
+              console.warn("Skipping image (no valid path):", img);
+            }
           }
-        });
-
-        stmt.finalize();
+        } catch (imgErr) {
+          console.error("⚠️ Some images failed to save:", imgErr);
+          // Non-fatal for images — report itself is already saved
+        }
 
         // 🔥 Trigger Analytics Parser
         parseReportDiseases(reportId, patientId, sections);
@@ -310,19 +342,20 @@ const updateReport = async (reportId, data) => {
           db.run("DELETE FROM images WHERE report_id = ?", [reportId], (e) => e ? rej(e) : res());
         });
 
-        // 2. Insert the new images
-        const stmt = db.prepare(
-          "INSERT INTO images (report_id, file_path, position, nbi_label, brightness, contrast) VALUES (?, ?, ?, ?, ?, ?)"
-        );
-
-        images.forEach((img, index) => {
+        // 2. Insert the new images — properly awaited
+        for (let index = 0; index < images.length; index++) {
+          const img = images[index];
           const finalPath = img.relativePath ? img.relativePath : img.filePath;
           if (finalPath && finalPath.trim() !== "") {
-            stmt.run(reportId, finalPath, index, img.nbiLabel || null, img.brightness ?? 70, img.contrast ?? 70);
+            await new Promise((res, rej) => {
+              db.run(
+                "INSERT INTO images (report_id, file_path, position, nbi_label, brightness, contrast) VALUES (?, ?, ?, ?, ?, ?)",
+                [reportId, finalPath, index, img.nbiLabel || null, img.brightness ?? 70, img.contrast ?? 70],
+                (e) => e ? rej(e) : res()
+              );
+            });
           }
-        });
-
-        stmt.finalize();
+        }
 
         // 3. Delete existing diseases
         await new Promise((res, rej) => {
@@ -511,7 +544,7 @@ const saveReportPdf = (reportNumber, base64Data, filename) => {
         [relativePath, reportNumber],
         function (err) {
           if (err) reject(err);
-          else resolve({ success: true, filePath: relativePath });
+          else resolve({ success: true, filePath: relativePath, absolutePath: filePath });
         }
       );
     } catch (e) {
@@ -535,7 +568,7 @@ const saveReportWord = (reportNumber, htmlContent, filename) => {
       const baseReportsPath = getStoragePaths().reports;
       const relativePath = path.relative(baseReportsPath, filePath);
 
-      resolve({ success: true, filePath: relativePath });
+      resolve({ success: true, filePath: relativePath, absolutePath: filePath });
     } catch (e) {
       reject(e);
     }

@@ -118,6 +118,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ value, onChange, minHei
       {/* ── Toolbar ── */}
       <div style={{
         display: "flex",
+        flexWrap: "wrap",
         alignItems: "center",
         gap: "6px",
         padding: "6px 10px",

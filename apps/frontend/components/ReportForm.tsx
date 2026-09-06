@@ -760,7 +760,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   <MdDragIndicator size={20} />
                 </div>
                 
-                <div style={{ flex: 1, pointerEvents: draggedSectionIdx !== null ? "none" : "auto" }}>
+                <div style={{ flex: 1, minWidth: 0, pointerEvents: draggedSectionIdx !== null ? "none" : "auto" }}>
                   {section.isHeading ? (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <input type="text" value={section.title} onChange={e => updateHeadingTitle(i, e.target.value)}
