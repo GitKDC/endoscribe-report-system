@@ -52,6 +52,14 @@ export default function ReportsPage() {
   const [isSendingWhatsapp, setIsSendingWhatsapp] = useState(false);
   const [sendingTarget, setSendingTarget] = useState<"patient" | "doctor" | "self" | null>(null);
 
+  // Toast state
+  const [toasts, setToasts] = useState<{id: number, text: string, type: "success"|"error"}[]>([]);
+  const addToast = (text: string, type: "success" | "error") => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, text, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
+  };
+
   const fetchReports = async () => {
     if (!(window as any).api) return;
     setLoading(true);
@@ -85,13 +93,13 @@ export default function ReportsPage() {
         doctorId
       });
       if (result.success) {
-        alert("Reports exported successfully to " + result.filePath);
+        addToast("Reports exported successfully to " + result.filePath, "success");
       } else if (result.message !== "Canceled") {
-        alert("Export failed: " + result.message);
+        addToast("Export failed: " + result.message, "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to export reports");
+      addToast("Failed to export reports", "error");
     }
   };
 
@@ -150,7 +158,7 @@ export default function ReportsPage() {
           );
         } catch (err) {
           console.error("PDF generation failed", err);
-          alert("Failed to generate PDF");
+          addToast("Failed to generate PDF", "error");
         } finally {
           setGeneratingId(null);
           setDownloadingReport(null);
@@ -168,8 +176,20 @@ export default function ReportsPage() {
       setWhatsappDoctorPhone(data.referral_doctor_phone || "");
       setWhatsappSelfPhone(localStorage.getItem("whatsapp_self_phone") || "");
     } catch (err) {
-      alert("Failed to fetch report details");
+      addToast("Failed to fetch report details", "error");
     }
+  };
+
+  const [isUploadingToMeta, setIsUploadingToMeta] = useState(false);
+  const cancelWhatsappRef = React.useRef(false);
+
+  const handleCancelWhatsapp = () => {
+    cancelWhatsappRef.current = true;
+    setIsSendingWhatsapp(false);
+    setSendingTarget(null);
+    setDownloadingReport(null);
+    setGeneratingId(null);
+    addToast("WhatsApp send cancelled", "error");
   };
 
   const submitSendWhatsapp = async (target: "patient" | "doctor" | "self") => {
@@ -178,14 +198,16 @@ export default function ReportsPage() {
     else if (target === "doctor") targetPhone = whatsappDoctorPhone;
     else if (target === "self") {
       targetPhone = whatsappSelfPhone;
-      localStorage.setItem("whatsapp_self_phone", whatsappSelfPhone); // Remember for next time
+      localStorage.setItem("whatsapp_self_phone", whatsappSelfPhone);
     }
     
-    if (!targetPhone) return alert("Please enter a phone number");
+    if (!targetPhone) return addToast("Please enter a phone number", "error");
+    
+    cancelWhatsappRef.current = false;
     setIsSendingWhatsapp(true);
+    setIsUploadingToMeta(false);
     setSendingTarget(target);
     
-    // First, generate and save the PDF locally
     setDownloadingReport(whatsappModalReport);
     setGeneratingId(whatsappModalReport.id);
     
@@ -197,11 +219,12 @@ export default function ReportsPage() {
           `${whatsappModalReport.age} Yrs / ${whatsappModalReport.gender}`,
           whatsappModalReport.report_type,
           whatsappModalReport.report_number,
-          false // downloadToDownloads=false so it saves locally and returns absolutePath
+          false
         );
 
+        if (cancelWhatsappRef.current) return;
+
         if (pdfResult && pdfResult.absolutePath) {
-          // Both "doctor" and "self" are treated as a doctor for the message template
           const isDoctor = target === "doctor" || target === "self";
           
           const reportData = {
@@ -211,20 +234,21 @@ export default function ReportsPage() {
             reportType: whatsappModalReport.report_type
           };
 
+          setIsUploadingToMeta(true);
           const sendRes = await (window as any).api.sendWhatsAppReport(pdfResult.absolutePath, targetPhone, isDoctor, reportData);
           if (sendRes.success) {
-            alert(`WhatsApp message sent successfully to ${target}!`);
+            addToast(`WhatsApp message sent successfully to ${target}!`, "success");
             if (target === "patient") setWhatsappPhone("");
             if (target === "doctor") setWhatsappDoctorPhone("");
-            // Keep modal open so they can send to others if they want
           } else {
-            alert("Failed to send WhatsApp: " + sendRes.message);
+            addToast("Failed to send WhatsApp: " + sendRes.message, "error");
           }
         }
       } catch (err: any) {
-        alert("Failed to send: " + err.message);
+        addToast("Failed to send: " + err.message, "error");
       } finally {
         setIsSendingWhatsapp(false);
+        setIsUploadingToMeta(false);
         setSendingTarget(null);
         setDownloadingReport(null);
         setGeneratingId(null);
@@ -243,7 +267,34 @@ export default function ReportsPage() {
     }));
 
   return (
-    <div style={{ padding: "32px", fontFamily: "'Inter', sans-serif", backgroundColor: "#f4f7f6", minHeight: "100vh" }}>
+    <>
+      {/* ── Toast stack ───────────────────────────────────────────────────── */}
+      <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 99999, display: "flex", flexDirection: "column", gap: "8px" }}>
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              backgroundColor: t.type === "success" ? "#198754" : "#dc3545",
+              color: "white",
+              fontSize: "14px",
+              fontWeight: 500,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+              animation: "toastIn 0.3s ease",
+              minWidth: "220px",
+              maxWidth: "320px",
+            }}
+          >
+            {t.type === "success" ? "✓ " : "✕ "}{t.text}
+          </div>
+        ))}
+      </div>
+      <style>{`
+        @keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+      `}</style>
+      
+      <div style={{ padding: "32px", fontFamily: "'Inter', sans-serif", backgroundColor: "#f4f7f6", minHeight: "100vh" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <h2 style={{ color: "#1a3a52", fontSize: "28px", fontWeight: "800", margin: 0 }}>Patient Reports</h2>
         <Button 
@@ -503,14 +554,29 @@ export default function ReportsPage() {
                     placeholder="Patient Phone (e.g. 919876543210)"
                     style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                   />
-                  <Button 
-                    variant="primary" 
-                    style={{ background: "#16a34a", borderColor: "#16a34a", padding: "8px 16px" }} 
-                    onClick={() => submitSendWhatsapp("patient")} 
-                    disabled={isSendingWhatsapp || !whatsappPhone}
-                  >
-                    {sendingTarget === "patient" ? "Sending..." : "Send"}
-                  </Button>
+                  {isSendingWhatsapp && sendingTarget === "patient" ? (
+                    <Button 
+                      variant="primary" 
+                      style={{ 
+                        background: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                        borderColor: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                        padding: "8px 16px" 
+                      }} 
+                      onClick={() => { handleCancelWhatsapp(); }}
+                      disabled={isUploadingToMeta}
+                    >
+                      {isUploadingToMeta ? "Sending..." : "Cancel"}
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="primary" 
+                      style={{ background: "#16a34a", borderColor: "#16a34a", padding: "8px 16px" }} 
+                      onClick={() => submitSendWhatsapp("patient")} 
+                      disabled={isSendingWhatsapp || !whatsappPhone}
+                    >
+                      Send
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -525,14 +591,29 @@ export default function ReportsPage() {
                       placeholder="Doctor Phone (e.g. 919876543210)"
                       style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                     />
-                    <Button 
-                      variant="primary" 
-                      style={{ background: "#0284c7", borderColor: "#0284c7", padding: "8px 16px" }} 
-                      onClick={() => submitSendWhatsapp("doctor")} 
-                      disabled={isSendingWhatsapp || !whatsappDoctorPhone}
-                    >
-                      {sendingTarget === "doctor" ? "Sending..." : "Send"}
-                    </Button>
+                    {isSendingWhatsapp && sendingTarget === "doctor" ? (
+                      <Button 
+                        variant="primary" 
+                        style={{ 
+                          background: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                          borderColor: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                          padding: "8px 16px" 
+                        }} 
+                        onClick={() => { handleCancelWhatsapp(); }}
+                        disabled={isUploadingToMeta}
+                      >
+                        {isUploadingToMeta ? "Sending..." : "Cancel"}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="primary" 
+                        style={{ background: "#0284c7", borderColor: "#0284c7", padding: "8px 16px" }} 
+                        onClick={() => submitSendWhatsapp("doctor")} 
+                        disabled={isSendingWhatsapp || !whatsappDoctorPhone}
+                      >
+                        Send
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -548,14 +629,29 @@ export default function ReportsPage() {
                       placeholder="Your Phone (e.g. 919876543210)"
                       style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", fontSize: "13px" }}
                     />
-                    <Button 
-                      variant="primary" 
-                      style={{ background: "#8b5cf6", borderColor: "#8b5cf6", padding: "8px 16px" }} 
-                      onClick={() => submitSendWhatsapp("self")} 
-                      disabled={isSendingWhatsapp || !whatsappSelfPhone}
-                    >
-                      {sendingTarget === "self" ? "Sending..." : "Send"}
-                    </Button>
+                    {isSendingWhatsapp && sendingTarget === "self" ? (
+                      <Button 
+                        variant="primary" 
+                        style={{ 
+                          background: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                          borderColor: isUploadingToMeta ? "#6b7280" : "#dc3545", 
+                          padding: "8px 16px" 
+                        }} 
+                        onClick={() => { handleCancelWhatsapp(); }}
+                        disabled={isUploadingToMeta}
+                      >
+                        {isUploadingToMeta ? "Sending..." : "Cancel"}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="primary" 
+                        style={{ background: "#8b5cf6", borderColor: "#8b5cf6", padding: "8px 16px" }} 
+                        onClick={() => submitSendWhatsapp("self")} 
+                        disabled={isSendingWhatsapp || !whatsappSelfPhone}
+                      >
+                        Send
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -587,6 +683,7 @@ export default function ReportsPage() {
           />
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

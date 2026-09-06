@@ -390,6 +390,9 @@ function CreateReportInner() {
     setSelectedDoctorIds(defaults);
     localStorage.removeItem("endoscribe_draft_report");
     addToast("Form cleared", "success");
+    setTimeout(() => {
+      document.getElementById("patientNameInput")?.focus();
+    }, 10);
   };
 
   // ── Save as Template handlers ───────────────────────────────────────────────

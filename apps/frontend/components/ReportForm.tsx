@@ -375,7 +375,7 @@ const ReportForm: React.FC<ReportFormProps> = ({
                   <div style={{ position: "absolute", right: "8px", pointerEvents: "none", color: THEME.teal, display: "flex" }}><IoIosArrowDown size={14} /></div>
                 </div>
                 <div ref={patientInputRef} style={{ position: "relative", flex: 1 }}>
-                  <input type="text" value={patientName} 
+                  <input type="text" id="patientNameInput" value={patientName} 
                     onChange={e => {
                       onPatientNameChange(e.target.value);
                       setShowPatientSugs(true);
